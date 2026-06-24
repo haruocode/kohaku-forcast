@@ -396,6 +396,28 @@ src/
 - **Zustand はサーバーと無関係なUIローカル状態だけ**に使う
   （モーダルの開閉、選択中タブなど）。単純なものは `useState` で十分。
 
+## セットアップ / 環境
+
+### バインディング（`wrangler.jsonc`）
+
+- D1 / KV などのCloudflareリソースは `wrangler.jsonc` に定義し、`Env` 型で受け取る。
+- D1: バインディング名 `DB`（コード内は `env.DB`）。
+- セッションにKVを使う場合はKV名前空間を定義する。
+
+### シークレット / 環境変数
+
+- 秘密情報は **`wrangler secret put`** で登録する（本番）。
+  ローカル開発では **`.dev.vars`** に置く。**どちらもコミットしない**。
+- 必要なシークレット:
+  - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`（Google OAuth）
+  - `SESSION_SECRET`（Cookie / JWT 署名用）
+
+### テスト
+
+- テストランナーは **Vitest**（Vite前提のため）。
+- スコアリング・早押し係数などの純粋ロジックは、DB非依存で単体テストできるよう分離する。
+- D1/KV を絡める結合テストが必要な場合は **`@cloudflare/vitest-pool-workers`** を使う。
+
 ## AIエージェントへの指示
 
 このプロジェクトを変更する際は:
