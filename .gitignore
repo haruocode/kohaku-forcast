@@ -7,9 +7,10 @@ dist/
 
 # Secrets / local env (never commit)
 .dev.vars
-.dev.vars.*
+.dev.vars.local
 .env
 .env.*
+!.dev.vars.example
 
 # Logs
 *.log

@@ -1,0 +1,11 @@
+# ローカル開発用のシークレット。このファイルをコピーして `.dev.vars` を作る。
+# 実際の値はコミットしないこと（.dev.vars は .gitignore 済み）。
+
+GOOGLE_CLIENT_ID="your-google-client-id"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"
+SESSION_SECRET="generate-a-long-random-string"
+
+# Google Cloud Console の OAuth クライアントに登録するコールバックURLと一致させる
+OAUTH_REDIRECT_URI="http://localhost:5173/api/auth/google/callback"
+# ログイン後に戻る先（webの開発サーバー）
+POST_LOGIN_REDIRECT="http://localhost:5173/"

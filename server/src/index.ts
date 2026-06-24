@@ -1,10 +1,11 @@
 import { Hono } from "hono";
-import type { Bindings } from "./types/env";
+import authRoutes from "./routes/auth";
+import type { Bindings, Variables } from "./types/env";
 
-const app = new Hono<{ Bindings: Bindings }>();
-
-app.get("/", (c) => c.json({ ok: true, service: "kohaku-forcast" }));
+const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 app.get("/health", (c) => c.json({ status: "ok" }));
+
+app.route("/api/auth", authRoutes);
 
 export default app;
