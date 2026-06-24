@@ -1,0 +1,11 @@
+{
+  "name": "kohaku-forcast",
+  "private": true,
+  "packageManager": "pnpm@11.9.0",
+  "scripts": {
+    "dev:server": "pnpm --filter @kohaku/server dev",
+    "dev:web": "pnpm --filter @kohaku/web dev",
+    "test": "pnpm --filter @kohaku/server test",
+    "typecheck": "pnpm -r typecheck"
+  }
+}

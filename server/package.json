@@ -1,0 +1,29 @@
+{
+  "name": "@kohaku/server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build": "wrangler deploy --dry-run",
+    "typecheck": "tsc --noEmit",
+    "types": "wrangler types",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply kohaku-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply kohaku-db --remote",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.38.3",
+    "hono": "^4.6.14",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.5.40",
+    "@cloudflare/workers-types": "^4.20241218.0",
+    "drizzle-kit": "^0.30.1",
+    "typescript": "^5.7.2",
+    "vitest": "2.1.8",
+    "wrangler": "^4.104.0"
+  }
+}

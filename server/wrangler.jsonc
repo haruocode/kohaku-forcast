@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "kohaku-forcast",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "kohaku-db",
+      // 実DB作成後に `wrangler d1 create kohaku-db` で得たIDを入れる
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "./drizzle"
+    }
+  ]
+  // セッションにKVを使う場合は下記を有効化し、`wrangler kv namespace create SESSIONS` のIDを入れる
+  // ,"kv_namespaces": [
+  //   { "binding": "SESSIONS", "id": "REPLACE_WITH_KV_NAMESPACE_ID" }
+  // ]
+}

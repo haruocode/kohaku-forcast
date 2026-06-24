@@ -1,0 +1,10 @@
+packages:
+  - "web"
+  - "server"
+allowBuilds:
+  esbuild: true
+  sharp: false
+  workerd: true
+minimumReleaseAgeExclude:
+  - miniflare@4.20260623.0
+  - wrangler@4.104.0
