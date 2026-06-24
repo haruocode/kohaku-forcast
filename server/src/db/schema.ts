@@ -19,6 +19,9 @@ export const users = sqliteTable("users", {
   googleSub: text("google_sub").notNull().unique(),
   avatarUrl: text("avatar_url"),
   isAdmin: integer("is_admin", { mode: "boolean" }).notNull().default(false),
+  // 記念トークンの送付先。所有を署名で確認後に設定する。
+  solanaAddress: text("solana_address"),
+  walletVerifiedAt: text("wallet_verified_at"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -118,5 +121,30 @@ export const results = sqliteTable(
   (t) => [
     // 同一シーズン・同一アーティストの結果は1行のみ
     uniqueIndex("results_season_artist_unq").on(t.seasonId, t.artistId),
+  ],
+);
+
+// 記念トークンの配布記録（冪等性の台帳）。
+export const tokenAwards = sqliteTable(
+  "token_awards",
+  {
+    id: id(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    seasonId: text("season_id")
+      .notNull()
+      .references(() => seasons.id, { onDelete: "cascade" }),
+    amount: integer("amount").notNull(),
+    solanaAddress: text("solana_address").notNull(),
+    txSignature: text("tx_signature"),
+    // pending / sent / failed
+    status: text("status").notNull().default("pending"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    // 同一ユーザー・同一シーズンへの配布は1回のみ
+    uniqueIndex("token_awards_user_season_unq").on(t.userId, t.seasonId),
   ],
 );
