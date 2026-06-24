@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { Db } from "../db";
 import { users } from "../db/schema";
 import type { GoogleProfile } from "../auth/google";
@@ -8,6 +8,12 @@ export type User = typeof users.$inferSelect;
 /** id でユーザーを取得する */
 export async function findUserById(db: Db, id: string): Promise<User | undefined> {
   return db.select().from(users).where(eq(users.id, id)).get();
+}
+
+/** 複数idのユーザーをまとめて取得する */
+export async function findUsersByIds(db: Db, ids: string[]): Promise<User[]> {
+  if (ids.length === 0) return [];
+  return db.select().from(users).where(inArray(users.id, ids)).all();
 }
 
 /**

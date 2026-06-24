@@ -1,0 +1,126 @@
+import { describe, it, expect } from "vitest";
+import {
+  computeRanking,
+  type RankablePrediction,
+  type ResultsByArtist,
+} from "./ranking";
+import type { SeasonWindow } from "./scoring";
+
+const window: SeasonWindow = {
+  openAt: "2026-11-01T00:00:00.000Z",
+  closeAt: "2026-12-01T00:00:00.000Z",
+};
+
+// 早押しの影響を消すため、全予想を締切間際（e≒0, 倍率≒1.0）に置く
+const lateAt = "2026-11-30T23:00:00.000Z";
+
+const pred = (
+  userId: string,
+  artistId: string,
+  songId: string | null,
+  createdAt = lateAt,
+): RankablePrediction => ({
+  userId,
+  artistId,
+  predictedSongId: songId,
+  createdAt,
+  updatedAt: createdAt,
+});
+
+const results: ResultsByArtist = new Map([
+  ["a1", { appeared: true, actualSongId: "s1" }],
+  ["a2", { appeared: false, actualSongId: null }],
+]);
+
+describe("computeRanking", () => {
+  it("合計スコアの高い順に並ぶ", () => {
+    // u1: 両的中 ≒30 / u2: 出場のみ的中 ≒10
+    const entries = computeRanking(
+      [pred("u1", "a1", "s1"), pred("u2", "a1", "wrong-song")],
+      results,
+      window,
+    );
+    expect(entries.map((e) => e.userId)).toEqual(["u1", "u2"]);
+    expect(Math.round(entries[0]!.totalScore)).toBe(30);
+    expect(Math.round(entries[1]!.totalScore)).toBe(10);
+    expect(entries[0]!.rank).toBe(1);
+    expect(entries[1]!.rank).toBe(2);
+  });
+
+  it("外れ予想はスコア0・的中件数に含めない", () => {
+    const entries = computeRanking([pred("u1", "a2", null)], results, window);
+    expect(entries[0]!.totalScore).toBe(0);
+    expect(entries[0]!.hitCount).toBe(0);
+  });
+
+  it("同点なら的中件数の多い方が上位", () => {
+    // u1: a1で両的中(30) / u2: a1出場のみ(10)+別の的中で30 になるよう調整
+    // ここでは件数差を作る: u1は1件で30、u2は… 同点30を2件で作る
+    const r: ResultsByArtist = new Map([
+      ["a1", { appeared: true, actualSongId: "s1" }], // 両的中=30
+      ["a3", { appeared: true, actualSongId: "s3" }], // 出場のみ=10
+      ["a4", { appeared: true, actualSongId: "s4" }], // 出場のみ=10
+      ["a5", { appeared: true, actualSongId: "s5" }], // 出場のみ=10
+    ]);
+    const entries = computeRanking(
+      [
+        pred("u1", "a1", "s1"), // 30 を1件
+        pred("u2", "a3", null), // 10
+        pred("u2", "a4", null), // 10
+        pred("u2", "a5", null), // 10 → 合計30を3件
+      ],
+      r,
+      window,
+    );
+    // 合計は同点(30)、的中件数 u2(3) > u1(1) なので u2 が上位
+    expect(entries.map((e) => e.userId)).toEqual(["u2", "u1"]);
+  });
+
+  it("合計・件数とも同じなら早い投稿が上位、順位は同値", () => {
+    const r: ResultsByArtist = new Map([
+      ["a1", { appeared: true, actualSongId: "s1" }],
+    ]);
+    // スコアを揃えるため updatedAt（早押し係数の基準）は同一にし、
+    // createdAt（最初の投稿）だけずらす
+    const entries = computeRanking(
+      [
+        {
+          userId: "late",
+          artistId: "a1",
+          predictedSongId: "s1",
+          createdAt: "2026-11-30T23:30:00.000Z",
+          updatedAt: lateAt,
+        },
+        {
+          userId: "early",
+          artistId: "a1",
+          predictedSongId: "s1",
+          createdAt: "2026-11-30T22:00:00.000Z",
+          updatedAt: lateAt,
+        },
+      ],
+      r,
+      window,
+    );
+    expect(entries.map((e) => e.userId)).toEqual(["early", "late"]);
+    // スコア・件数が同じなので順位は同値（競技順位法）
+    expect(entries[0]!.rank).toBe(1);
+    expect(entries[1]!.rank).toBe(1);
+  });
+
+  it("早押し: 同じ的中でも早い方が高スコア", () => {
+    const r: ResultsByArtist = new Map([
+      ["a1", { appeared: true, actualSongId: "s1" }],
+    ]);
+    const entries = computeRanking(
+      [
+        pred("early", "a1", "s1", "2026-11-01T00:00:00.000Z"), // 最速 30×1.5=45
+        pred("late", "a1", "s1", "2026-11-30T23:00:00.000Z"), // 締切間際 ≒30
+      ],
+      r,
+      window,
+    );
+    expect(entries[0]!.userId).toBe("early");
+    expect(Math.round(entries[0]!.totalScore)).toBe(45);
+  });
+});
