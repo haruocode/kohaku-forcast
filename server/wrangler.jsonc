@@ -15,9 +15,38 @@
       "database_id": "REPLACE_WITH_D1_DATABASE_ID",
       "migrations_dir": "./drizzle"
     }
-  ]
+  ],
   // セッションにKVを使う場合は下記を有効化し、`wrangler kv namespace create SESSIONS` のIDを入れる
-  // ,"kv_namespaces": [
+  // "kv_namespaces": [
   //   { "binding": "SESSIONS", "id": "REPLACE_WITH_KV_NAMESPACE_ID" }
-  // ]
+  // ],
+
+  // 本番デプロイ用（`wrangler deploy --env production`）。
+  // API と SPA を同一オリジンで配信する（Cookie/OAuthが同一オリジンで完結）。
+  // 注意: 環境はトップレベルのバインディングを継承しないため D1 等を再定義する。
+  "env": {
+    "production": {
+      "vars": {
+        // 本番URLに合わせて書き換える（Worker/カスタムドメイン）
+        "OAUTH_REDIRECT_URI": "https://REPLACE_WITH_PROD_HOST/api/auth/google/callback",
+        "POST_LOGIN_REDIRECT": "/"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "kohaku-db",
+          "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+          "migrations_dir": "./drizzle"
+        }
+      ],
+      // フロント(web)のビルド成果物を静的アセットとして配信し、SPAフォールバックする。
+      // /api/* と /health は Worker を先に実行する。
+      "assets": {
+        "directory": "../web/dist/",
+        "not_found_handling": "single-page-application",
+        "binding": "ASSETS",
+        "run_worker_first": ["/api/*", "/health"]
+      }
+    }
+  }
 }
