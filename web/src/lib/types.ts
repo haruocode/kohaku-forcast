@@ -49,3 +49,12 @@ export type RankingRow = {
 };
 
 export type WalletChallenge = { message: string; challenge: string };
+
+export type TokenAward = {
+  id: string;
+  seasonId: string;
+  seasonYear: number;
+  amount: number;
+  status: "pending" | "sent" | "failed";
+  txSignature: string | null;
+};

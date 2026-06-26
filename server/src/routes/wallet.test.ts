@@ -5,7 +5,7 @@ import nacl from "tweetnacl";
 import bs58 from "bs58";
 import app from "../index";
 import { getDb } from "../db";
-import { users } from "../db/schema";
+import { users, seasons, tokenAwards } from "../db/schema";
 import { findUserById } from "../repositories/users";
 
 const db = getDb(env.DB);
@@ -45,6 +45,8 @@ const postJson = (path: string, cookie: string | null, body: unknown) =>
   );
 
 beforeEach(async () => {
+  await db.delete(tokenAwards).run();
+  await db.delete(seasons).run();
   await db.delete(users).run();
 });
 
@@ -128,6 +130,30 @@ describe("ウォレット連携", () => {
       challenge,
     });
     expect(res.status).toBe(400);
+  });
+
+  it("自分の獲得トークン一覧を取得できる", async () => {
+    const uid = await seedUser("u1");
+    await db.insert(seasons).values({ id: "s1", year: 2026, predictionCloseAt: null });
+    await db.insert(tokenAwards).values({
+      userId: uid,
+      seasonId: "s1",
+      amount: 30,
+      solanaAddress: "WALLET_U1",
+      status: "sent",
+      txSignature: "sig-1",
+    });
+
+    const res = await app.request(
+      "http://localhost/api/wallet/awards",
+      { headers: { cookie: await sessionCookie(uid) } },
+      env,
+    );
+    expect(res.status).toBe(200);
+    const rows = (await res.json()) as { seasonYear: number; amount: number }[];
+    expect(rows).toEqual([
+      expect.objectContaining({ seasonYear: 2026, amount: 30, status: "sent" }),
+    ]);
   });
 
   it("不正アドレスは 400", async () => {

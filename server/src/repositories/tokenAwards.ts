@@ -1,8 +1,38 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import type { Db } from "../db";
-import { tokenAwards } from "../db/schema";
+import { tokenAwards, seasons } from "../db/schema";
 
 export type TokenAward = typeof tokenAwards.$inferSelect;
+
+export type UserAward = {
+  id: string;
+  seasonId: string;
+  seasonYear: number;
+  amount: number;
+  status: string;
+  txSignature: string | null;
+};
+
+/** あるユーザーの獲得トークン一覧（シーズン年を添える / 新しい年から） */
+export async function listAwardsByUser(
+  db: Db,
+  userId: string,
+): Promise<UserAward[]> {
+  return db
+    .select({
+      id: tokenAwards.id,
+      seasonId: tokenAwards.seasonId,
+      seasonYear: seasons.year,
+      amount: tokenAwards.amount,
+      status: tokenAwards.status,
+      txSignature: tokenAwards.txSignature,
+    })
+    .from(tokenAwards)
+    .innerJoin(seasons, eq(tokenAwards.seasonId, seasons.id))
+    .where(eq(tokenAwards.userId, userId))
+    .orderBy(desc(seasons.year))
+    .all();
+}
 
 export async function findAward(
   db: Db,

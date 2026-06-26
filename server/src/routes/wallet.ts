@@ -7,6 +7,7 @@ import {
 } from "../auth/wallet-challenge";
 import { isValidSolanaAddress, verifyWalletSignature } from "../domain/wallet";
 import { setWalletAddress } from "../repositories/users";
+import { listAwardsByUser } from "../repositories/tokenAwards";
 import { linkWalletSchema } from "../schemas/wallet";
 import { errorBody } from "../lib/http";
 import type { Bindings, Variables } from "../types/env";
@@ -17,6 +18,13 @@ const wallet = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 wallet.post("/challenge", requireAuth, async (c) => {
   const challenge = await issueWalletChallenge(c.get("userId"), c.env.SESSION_SECRET);
   return c.json(challenge);
+});
+
+// 自分の獲得した記念トークン一覧
+wallet.get("/awards", requireAuth, async (c) => {
+  const db = getDb(c.env.DB);
+  const awards = await listAwardsByUser(db, c.get("userId"));
+  return c.json(awards);
 });
 
 // 署名を検証してウォレットを連携する
