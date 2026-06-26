@@ -12,6 +12,10 @@ export type Bindings = {
   OAUTH_REDIRECT_URI?: string;
   // ログイン完了後にリダイレクトする先（既定: "/"）
   POST_LOGIN_REDIRECT?: string;
+  // 記念トークン配布用（未設定なら配布機能は無効）
+  SOLANA_RPC_URL?: string;
+  TOKEN_MINT_ADDRESS?: string;
+  MINT_AUTHORITY_SECRET?: string; // base58のsecret key
 };
 
 // 認証済みリクエストで参照するコンテキスト変数

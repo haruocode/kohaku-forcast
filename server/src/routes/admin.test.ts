@@ -188,3 +188,44 @@ describe("管理作成API", () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe("POST /api/admin/seasons/:id/distribute", () => {
+  it("締切前は 409", async () => {
+    const uid = await seedUser("admin", true);
+    // beforeEach の s1 は predictionCloseAt=null（受付中）
+    const res = await postJson(
+      "/api/admin/seasons/s1/distribute",
+      await sessionCookie(uid),
+      {},
+    );
+    expect(res.status).toBe(409);
+  });
+
+  it("締切後・トークン未設定なら 501 NOT_CONFIGURED", async () => {
+    const uid = await seedUser("admin", true);
+    await db.insert(seasons).values({
+      id: "closed",
+      year: 2025,
+      predictionCloseAt: "2025-12-31T21:00:00.000Z",
+    });
+    const res = await postJson(
+      "/api/admin/seasons/closed/distribute",
+      await sessionCookie(uid),
+      {},
+    );
+    expect(res.status).toBe(501);
+    expect((await res.json()) as { error: { code: string } }).toMatchObject({
+      error: { code: "NOT_CONFIGURED" },
+    });
+  });
+
+  it("非管理者は 403", async () => {
+    const uid = await seedUser("u1", false);
+    const res = await postJson(
+      "/api/admin/seasons/s1/distribute",
+      await sessionCookie(uid),
+      {},
+    );
+    expect(res.status).toBe(403);
+  });
+});

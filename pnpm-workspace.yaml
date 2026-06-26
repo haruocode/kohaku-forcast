@@ -2,8 +2,11 @@ packages:
   - "web"
   - "server"
 allowBuilds:
+  bigint-buffer: false
+  bufferutil: false
   esbuild: true
   sharp: false
+  utf-8-validate: false
   workerd: true
 minimumReleaseAgeExclude:
   - miniflare@4.20260623.0
