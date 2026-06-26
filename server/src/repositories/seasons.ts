@@ -21,6 +21,21 @@ export async function getCurrentSeason(db: Db): Promise<Season | undefined> {
   return db.select().from(seasons).orderBy(desc(seasons.year)).limit(1).get();
 }
 
+export async function createSeason(
+  db: Db,
+  input: { year: number; title?: string; predictionOpenAt?: string },
+): Promise<Season> {
+  return db
+    .insert(seasons)
+    .values({
+      year: input.year,
+      title: input.title ?? null,
+      predictionOpenAt: input.predictionOpenAt ?? null,
+    })
+    .returning()
+    .get();
+}
+
 /** 締切操作: 公式発表の日時を prediction_close_at に設定する */
 export async function closeSeason(
   db: Db,

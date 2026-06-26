@@ -2,9 +2,17 @@ import { Hono } from "hono";
 import type { ZodSchema } from "zod";
 import { getDb } from "../db";
 import { requireAdmin } from "../auth/admin";
-import { findSeasonById, closeSeason } from "../repositories/seasons";
+import { findSeasonById, closeSeason, createSeason } from "../repositories/seasons";
+import { createArtist, findArtistById } from "../repositories/artists";
+import { createSong } from "../repositories/songs";
 import { upsertResults } from "../repositories/results";
-import { closeSeasonSchema, confirmResultsSchema } from "../schemas/admin";
+import {
+  closeSeasonSchema,
+  confirmResultsSchema,
+  createSeasonSchema,
+  createArtistSchema,
+  createSongSchema,
+} from "../schemas/admin";
 import { errorBody } from "../lib/http";
 import type { Bindings, Variables } from "../types/env";
 
@@ -52,6 +60,41 @@ admin.post("/results", async (c) => {
   }
   await upsertResults(db, parsed.data.seasonId, parsed.data.entries);
   return c.json({ ok: true, count: parsed.data.entries.length });
+});
+
+// シーズン作成
+admin.post("/seasons", async (c) => {
+  const parsed = await parseBody(c, createSeasonSchema);
+  if ("message" in parsed) {
+    return c.json(errorBody("VALIDATION_ERROR", parsed.message), 400);
+  }
+  const season = await createSeason(getDb(c.env.DB), parsed.data);
+  return c.json(season, 201);
+});
+
+// アーティスト作成（別名も同時に登録可能）
+admin.post("/artists", async (c) => {
+  const parsed = await parseBody(c, createArtistSchema);
+  if ("message" in parsed) {
+    return c.json(errorBody("VALIDATION_ERROR", parsed.message), 400);
+  }
+  const artist = await createArtist(getDb(c.env.DB), parsed.data);
+  return c.json(artist, 201);
+});
+
+// 曲作成
+admin.post("/songs", async (c) => {
+  const parsed = await parseBody(c, createSongSchema);
+  if ("message" in parsed) {
+    return c.json(errorBody("VALIDATION_ERROR", parsed.message), 400);
+  }
+  const db = getDb(c.env.DB);
+  const artist = await findArtistById(db, parsed.data.artistId);
+  if (!artist) {
+    return c.json(errorBody("NOT_FOUND", "アーティストが見つかりません"), 404);
+  }
+  const song = await createSong(db, parsed.data);
+  return c.json(song, 201);
 });
 
 export default admin;

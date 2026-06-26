@@ -138,3 +138,53 @@ describe("POST /api/admin/results", () => {
     expect(r?.songId).toBeNull();
   });
 });
+
+describe("管理作成API", () => {
+  it("シーズン・アーティスト（別名）・曲を作成できる", async () => {
+    const uid = await seedUser("admin", true);
+    const cookie = await sessionCookie(uid);
+
+    const season = await postJson("/api/admin/seasons", cookie, { year: 2027 });
+    expect(season.status).toBe(201);
+
+    const artistRes = await postJson("/api/admin/artists", cookie, {
+      name: "米津玄師",
+      nameKana: "よねづけんし",
+      aliases: ["ハチ", "Kenshi Yonezu"],
+    });
+    expect(artistRes.status).toBe(201);
+    const artist = (await artistRes.json()) as { id: string };
+
+    const songRes = await postJson("/api/admin/songs", cookie, {
+      artistId: artist.id,
+      title: "Lemon",
+      titleKana: "れもん",
+    });
+    expect(songRes.status).toBe(201);
+
+    // 別名検索でヒットする
+    const search = await app.request(
+      "http://localhost/api/artists/search?q=kenshi",
+      {},
+      env,
+    );
+    expect(((await search.json()) as unknown[]).length).toBe(1);
+  });
+
+  it("曲作成で存在しないアーティストは 404", async () => {
+    const uid = await seedUser("admin", true);
+    const res = await postJson("/api/admin/songs", await sessionCookie(uid), {
+      artistId: "missing",
+      title: "X",
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("非管理者は作成できない（403）", async () => {
+    const uid = await seedUser("u1", false);
+    const res = await postJson("/api/admin/seasons", await sessionCookie(uid), {
+      year: 2027,
+    });
+    expect(res.status).toBe(403);
+  });
+});

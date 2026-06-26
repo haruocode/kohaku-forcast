@@ -14,6 +14,22 @@ export async function findSongById(
   return db.select().from(songs).where(eq(songs.id, id)).get();
 }
 
+export async function createSong(
+  db: Db,
+  input: { artistId: string; title: string; titleKana?: string; releaseYear?: number },
+): Promise<Song> {
+  return db
+    .insert(songs)
+    .values({
+      artistId: input.artistId,
+      title: input.title,
+      titleKana: input.titleKana ?? null,
+      releaseYear: input.releaseYear ?? null,
+    })
+    .returning()
+    .get();
+}
+
 /** あるアーティストの曲一覧 */
 export async function listSongsByArtist(
   db: Db,
