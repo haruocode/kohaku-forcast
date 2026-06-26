@@ -1,0 +1,174 @@
+:root {
+  font-family: system-ui, -apple-system, "Hiragino Kaku Gothic ProN", sans-serif;
+  color: #1a1a1a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f6f6f8;
+}
+
+.app {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 16px 48px;
+}
+
+.authbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid #e3e3e8;
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.authbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.tabs button {
+  background: #fff;
+  border: 1px solid #d6d6dc;
+  border-radius: 999px;
+  padding: 6px 16px;
+  cursor: pointer;
+}
+
+.tabs button.active {
+  background: #d12d36;
+  border-color: #d12d36;
+  color: #fff;
+}
+
+.panel {
+  background: #fff;
+  border: 1px solid #e3e3e8;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.card {
+  background: #faf7f7;
+  border: 1px solid #ecdede;
+  border-radius: 10px;
+  padding: 12px;
+  margin: 12px 0;
+}
+
+label {
+  display: block;
+  margin: 10px 0;
+  font-size: 14px;
+}
+
+input,
+select {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+}
+
+input[type="range"] {
+  padding: 0;
+}
+
+button {
+  background: #d12d36;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+button.ghost,
+.btn {
+  background: #fff;
+  color: #d12d36;
+  border: 1px solid #d12d36;
+}
+
+a.btn {
+  text-decoration: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+}
+
+.result-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+}
+
+.result-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid #f0f0f3;
+}
+
+.result-list li button {
+  background: none;
+  color: #1a1a1a;
+  text-align: left;
+  padding: 4px 0;
+}
+
+.ranking {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ranking th,
+.ranking td {
+  border-bottom: 1px solid #eee;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.muted {
+  color: #888;
+  font-size: 14px;
+}
+
+.error {
+  color: #c0202a;
+  font-size: 14px;
+}
+
+.note {
+  color: #1a7f37;
+  font-size: 14px;
+}
