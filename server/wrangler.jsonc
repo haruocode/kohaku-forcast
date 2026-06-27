@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "kohaku-forcast",
+  "name": "kohaku-yoso",
   "main": "src/index.ts",
   "compatibility_date": "2026-06-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -12,7 +12,7 @@
       "binding": "DB",
       "database_name": "kohaku-db",
       // 実DB作成後に `wrangler d1 create kohaku-db` で得たIDを入れる
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "database_id": "657e8239-1073-4135-ad0b-79aa76c70259",
       "migrations_dir": "./drizzle"
     }
   ],
@@ -26,16 +26,17 @@
   // 注意: 環境はトップレベルのバインディングを継承しないため D1 等を再定義する。
   "env": {
     "production": {
+      "name": "kohaku-yoso",
       "vars": {
         // 本番URLに合わせて書き換える（Worker/カスタムドメイン）
-        "OAUTH_REDIRECT_URI": "https://REPLACE_WITH_PROD_HOST/api/auth/google/callback",
+        "OAUTH_REDIRECT_URI": "https://kohaku-yoso.haruocode.workers.dev/api/auth/google/callback",
         "POST_LOGIN_REDIRECT": "/"
       },
       "d1_databases": [
         {
           "binding": "DB",
           "database_name": "kohaku-db",
-          "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+          "database_id": "657e8239-1073-4135-ad0b-79aa76c70259",
           "migrations_dir": "./drizzle"
         }
       ],
