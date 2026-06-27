@@ -51,6 +51,9 @@ cd server
 npx wrangler secret put GOOGLE_CLIENT_ID --env production
 npx wrangler secret put GOOGLE_CLIENT_SECRET --env production
 npx wrangler secret put SESSION_SECRET --env production        # 十分長いランダム文字列
+# 外部音楽DB検索でSpotifyを優先する場合（任意・未設定ならMusicBrainzのみ）
+# npx wrangler secret put SPOTIFY_CLIENT_ID --env production
+# npx wrangler secret put SPOTIFY_CLIENT_SECRET --env production
 # 記念トークンを使う場合（後日）
 # npx wrangler secret put SOLANA_RPC_URL --env production
 # npx wrangler secret put TOKEN_MINT_ADDRESS --env production

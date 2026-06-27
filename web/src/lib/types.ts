@@ -48,6 +48,25 @@ export type RankingRow = {
   hitCount: number;
 };
 
+export type ExternalSource = "spotify" | "musicbrainz";
+
+export type ExternalArtist = {
+  source: ExternalSource;
+  externalId: string;
+  name: string;
+  imageUrl: string | null;
+  url: string | null;
+  detail: string | null;
+};
+
+export type ExternalTrack = {
+  source: ExternalSource;
+  externalId: string;
+  title: string;
+  artistName: string;
+  releaseYear: number | null;
+};
+
 export type WalletChallenge = { message: string; challenge: string };
 
 export type TokenAward = {

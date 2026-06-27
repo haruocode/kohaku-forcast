@@ -7,6 +7,10 @@ import { createArtist, findArtistById } from "../repositories/artists";
 import { createSong } from "../repositories/songs";
 import { upsertResults } from "../repositories/results";
 import { distributeSeasonTokens } from "../services/distribution";
+import {
+  searchExternalArtists,
+  searchExternalTracks,
+} from "../services/externalMusic";
 import { createMinterFromEnv } from "../token/minter-factory";
 import {
   closeSeasonSchema,
@@ -93,6 +97,26 @@ admin.post("/seasons", async (c) => {
   }
   const season = await createSeason(getDb(c.env.DB), parsed.data);
   return c.json(season, 201);
+});
+
+// 外部音楽DBでアーティストを検索（Spotify→MusicBrainzフォールバック）
+admin.get("/external/artists", async (c) => {
+  const q = c.req.query("q")?.trim();
+  if (!q) {
+    return c.json(errorBody("VALIDATION_ERROR", "検索語 q が必要です"), 400);
+  }
+  const results = await searchExternalArtists(c.env, q);
+  return c.json(results);
+});
+
+// 外部音楽DBで曲を検索（Spotify→MusicBrainzフォールバック）
+admin.get("/external/tracks", async (c) => {
+  const q = c.req.query("q")?.trim();
+  if (!q) {
+    return c.json(errorBody("VALIDATION_ERROR", "検索語 q が必要です"), 400);
+  }
+  const results = await searchExternalTracks(c.env, q);
+  return c.json(results);
 });
 
 // アーティスト作成（別名も同時に登録可能）

@@ -9,3 +9,9 @@ SESSION_SECRET="generate-a-long-random-string"
 OAUTH_REDIRECT_URI="http://localhost:5173/api/auth/google/callback"
 # ログイン後に戻る先（webの開発サーバー）
 POST_LOGIN_REDIRECT="http://localhost:5173/"
+
+# 外部音楽DB検索（管理画面の登録補助・任意）。
+# 未設定でも MusicBrainz は使える。Spotifyを優先したい場合のみ設定する。
+# https://developer.spotify.com でアプリ作成して取得する。
+SPOTIFY_CLIENT_ID=""
+SPOTIFY_CLIENT_SECRET=""
