@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <title>紅白予想</title>
+  <title>紅白出場者予想アプリ</title>
   <defs>
     <clipPath id="r">
       <rect x="2" y="2" width="60" height="60" rx="14" />
@@ -10,14 +10,6 @@
     <rect x="0" y="0" width="32" height="64" fill="#e60026" />
     <!-- 白組（右・白） -->
     <rect x="32" y="0" width="32" height="64" fill="#fafafa" />
-    <!-- 中央の金の星（受賞・お祝い感。両色にまたがって視認性を確保） -->
-    <path
-      fill="#f5b301"
-      stroke="#b97f00"
-      stroke-width="1.5"
-      stroke-linejoin="round"
-      d="M32 13l5.6 11.3 12.5 1.8-9 8.8 2.1 12.4L32 41.7 20.8 47.6l2.1-12.4-9-8.8 12.5-1.8z"
-    />
   </g>
   <!-- 外枠 -->
   <rect x="2" y="2" width="60" height="60" rx="14" fill="none" stroke="#1a1a1a" stroke-width="2" />
