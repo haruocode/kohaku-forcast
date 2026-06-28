@@ -184,24 +184,65 @@ function PredictionList({ season, me }: { season: Season; me: User | null }) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["predictions"] }),
   });
 
+  const list = data ?? [];
+
   return (
     <div>
       <h3>みんなの予想</h3>
-      <ul className="result-list">
-        {(data ?? []).map((p) => (
-          <li key={p.id}>
-            <span>
-              artist:{p.artistId.slice(0, 6)} / 確信度{p.confidence}
-              {p.comment ? ` / ${p.comment}` : ""}
-            </span>
-            {me && me.id === p.userId && season.isOpen && (
-              <button className="ghost" onClick={() => remove.mutate(p.id)}>
-                取消
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
+      {list.length === 0 ? (
+        <p className="muted">まだ予想がありません。</p>
+      ) : (
+        <ul className="prediction-list">
+          {list.map((p) => {
+            const mine = !!me && me.id === p.userId;
+            const removing = remove.isPending && remove.variables === p.id;
+            return (
+              <li key={p.id} className="prediction-item">
+                <div className="prediction-body">
+                  <div className="prediction-head">
+                    <span className="prediction-artist">
+                      {p.artistName ?? "（不明なアーティスト）"}
+                    </span>
+                    {p.songTitle ? (
+                      <span className="prediction-song">🎵 {p.songTitle}</span>
+                    ) : (
+                      <span className="prediction-song muted">出場予想のみ</span>
+                    )}
+                  </div>
+                  <div className="prediction-meta muted">
+                    <span className="stars" title={`確信度 ${p.confidence} / 5`}>
+                      {"★".repeat(p.confidence)}
+                      {"☆".repeat(5 - p.confidence)}
+                    </span>
+                    <span>
+                      {p.displayName ?? "匿名"}
+                      {mine ? "（あなた）" : ""}
+                    </span>
+                    {p.comment ? <span>「{p.comment}」</span> : null}
+                  </div>
+                </div>
+                {mine && season.isOpen && (
+                  <button
+                    className="ghost danger cancel-btn"
+                    disabled={removing}
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          `「${p.artistName ?? "この予想"}」の予想を取り消しますか？`,
+                        )
+                      ) {
+                        remove.mutate(p.id);
+                      }
+                    }}
+                  >
+                    {removing ? "取消中…" : "取り消す"}
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

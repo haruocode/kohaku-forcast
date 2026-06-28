@@ -53,7 +53,7 @@ body {
   background: #fff;
   color: #333;
   border: 1px solid #d6d6dc;
-  border-radius: 999px;
+  border-radius: 6px;
   padding: 6px 16px;
   cursor: pointer;
 }
@@ -67,14 +67,14 @@ body {
 .panel {
   background: #fff;
   border: 1px solid #e3e3e8;
-  border-radius: 12px;
+  border-radius: 6px;
   padding: 16px;
 }
 
 .card {
   background: #faf7f7;
   border: 1px solid #ecdede;
-  border-radius: 10px;
+  border-radius: 6px;
   padding: 12px;
   margin: 12px 0;
 }
@@ -92,7 +92,7 @@ select {
   margin-top: 4px;
   padding: 8px;
   border: 1px solid #ccc;
-  border-radius: 8px;
+  border-radius: 4px;
 }
 
 input[type="range"] {
@@ -103,7 +103,7 @@ button {
   background: #d12d36;
   color: #fff;
   border: none;
-  border-radius: 8px;
+  border-radius: 4px;
   padding: 8px 16px;
   cursor: pointer;
 }
@@ -118,7 +118,7 @@ button.ghost,
 a.btn {
   text-decoration: none;
   padding: 8px 16px;
-  border-radius: 8px;
+  border-radius: 4px;
 }
 
 .row {
@@ -148,7 +148,7 @@ a.btn {
 }
 
 .thumb {
-  border-radius: 4px;
+  border-radius: 2px;
   object-fit: cover;
   margin-right: 8px;
 }
@@ -158,7 +158,7 @@ a.btn {
   font-size: 11px;
   line-height: 1;
   padding: 2px 6px;
-  border-radius: 999px;
+  border-radius: 4px;
   color: #fff;
   vertical-align: middle;
 }
@@ -196,4 +196,76 @@ a.btn {
 .note {
   color: #1a7f37;
   font-size: 14px;
+}
+
+/* みんなの予想リスト */
+.prediction-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+}
+
+.prediction-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f0f3;
+}
+
+.prediction-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.prediction-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.prediction-artist {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.prediction-song {
+  font-size: 13px;
+}
+
+.prediction-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.stars {
+  color: #f5b301;
+  letter-spacing: 1px;
+}
+
+.cancel-btn {
+  flex: 0 0 auto;
+  font-size: 13px;
+  padding: 6px 12px;
+}
+
+button.danger {
+  color: #d12d36;
+  border-color: #e2b6b9;
+}
+
+button.danger:hover:not(:disabled) {
+  background: #fdecee;
+  border-color: #d12d36;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
 }

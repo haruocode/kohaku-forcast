@@ -1,8 +1,15 @@
 import { and, eq, desc } from "drizzle-orm";
 import type { Db } from "../db";
-import { predictions } from "../db/schema";
+import { predictions, artists, songs, users } from "../db/schema";
 
 export type Prediction = typeof predictions.$inferSelect;
+
+/** 表示用にアーティスト名・曲名・予想者名を添えた予想 */
+export type PredictionDetail = Prediction & {
+  artistName: string;
+  songTitle: string | null;
+  displayName: string;
+};
 
 /** 予想の作成に必要な、解決済みのローカル値 */
 export type CreatePredictionValues = {
@@ -95,6 +102,37 @@ export async function listPredictions(
   seasonId?: string,
 ): Promise<Prediction[]> {
   const base = db.select().from(predictions);
+  const rows = seasonId
+    ? await base.where(eq(predictions.seasonId, seasonId)).orderBy(desc(predictions.createdAt)).all()
+    : await base.orderBy(desc(predictions.createdAt)).all();
+  return rows;
+}
+
+/** 一覧表示用。アーティスト名・曲名・予想者名をJOINして返す。 */
+export async function listPredictionsDetailed(
+  db: Db,
+  seasonId?: string,
+): Promise<PredictionDetail[]> {
+  const base = db
+    .select({
+      id: predictions.id,
+      userId: predictions.userId,
+      seasonId: predictions.seasonId,
+      artistId: predictions.artistId,
+      songId: predictions.songId,
+      confidence: predictions.confidence,
+      comment: predictions.comment,
+      createdAt: predictions.createdAt,
+      updatedAt: predictions.updatedAt,
+      artistName: artists.name,
+      songTitle: songs.title,
+      displayName: users.displayName,
+    })
+    .from(predictions)
+    .innerJoin(artists, eq(predictions.artistId, artists.id))
+    .leftJoin(songs, eq(predictions.songId, songs.id))
+    .innerJoin(users, eq(predictions.userId, users.id));
+
   const rows = seasonId
     ? await base.where(eq(predictions.seasonId, seasonId)).orderBy(desc(predictions.createdAt)).all()
     : await base.orderBy(desc(predictions.createdAt)).all();

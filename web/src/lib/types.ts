@@ -38,6 +38,10 @@ export type Prediction = {
   confidence: number;
   comment: string | null;
   createdAt: string;
+  // 一覧APIが付与する表示用フィールド
+  artistName?: string;
+  songTitle?: string | null;
+  displayName?: string;
 };
 
 export type RankingRow = {

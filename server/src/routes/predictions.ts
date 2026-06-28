@@ -12,7 +12,7 @@ import {
   deletePrediction,
   findPredictionById,
   findDuplicate,
-  listPredictions,
+  listPredictionsDetailed,
 } from "../repositories/predictions";
 import {
   createPredictionSchema,
@@ -83,7 +83,7 @@ predictions.post("/", requireAuth, async (c) => {
 predictions.get("/", async (c) => {
   const db = getDb(c.env.DB);
   const seasonId = c.req.query("seasonId");
-  const rows = await listPredictions(db, seasonId);
+  const rows = await listPredictionsDetailed(db, seasonId);
   return c.json(rows);
 });
 
