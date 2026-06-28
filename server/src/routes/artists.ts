@@ -1,14 +1,27 @@
 import { Hono } from "hono";
 import { getDb } from "../db";
+import { requireAuth } from "../auth/session";
 import { listArtists, findArtistById } from "../repositories/artists";
 import { listSongsByArtist } from "../repositories/songs";
 import { searchArtists, clampLimit } from "../services/search";
+import { searchExternalArtists } from "../services/externalMusic";
 import { errorBody } from "../lib/http";
 import type { Bindings, Variables } from "../types/env";
 
 const artists = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
-// アーティスト検索（/:id より前に登録する）
+// 外部音楽DBでのアーティスト検索（予想時に直接選ぶ用。Spotify→MusicBrainz）。
+// 外部APIのクォータ保護のためログイン必須。/:id より前に登録する。
+artists.get("/external", requireAuth, async (c) => {
+  const q = c.req.query("q")?.trim();
+  if (!q) {
+    return c.json(errorBody("VALIDATION_ERROR", "検索語 q が必要です"), 400);
+  }
+  const results = await searchExternalArtists(c.env, q);
+  return c.json(results);
+});
+
+// アーティスト検索（ローカルDB。/:id より前に登録する）
 artists.get("/search", async (c) => {
   const q = c.req.query("q")?.trim();
   if (!q) {

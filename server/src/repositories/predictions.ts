@@ -1,12 +1,24 @@
 import { and, eq, desc } from "drizzle-orm";
 import type { Db } from "../db";
 import { predictions } from "../db/schema";
-import type {
-  CreatePredictionInput,
-  UpdatePredictionInput,
-} from "../schemas/predictions";
 
 export type Prediction = typeof predictions.$inferSelect;
+
+/** 予想の作成に必要な、解決済みのローカル値 */
+export type CreatePredictionValues = {
+  seasonId: string;
+  artistId: string;
+  songId: string | null;
+  confidence: number;
+  comment?: string;
+};
+
+/** 予想の更新に渡す、解決済みのローカル値（指定された項目のみ反映） */
+export type UpdatePredictionValues = {
+  songId?: string | null;
+  confidence?: number;
+  comment?: string | null;
+};
 
 export async function findPredictionById(
   db: Db,
@@ -38,7 +50,7 @@ export async function findDuplicate(
 export async function createPrediction(
   db: Db,
   userId: string,
-  input: CreatePredictionInput,
+  input: CreatePredictionValues,
 ): Promise<Prediction> {
   return db
     .insert(predictions)
@@ -46,7 +58,7 @@ export async function createPrediction(
       userId,
       seasonId: input.seasonId,
       artistId: input.artistId,
-      songId: input.songId ?? null,
+      songId: input.songId,
       confidence: input.confidence,
       comment: input.comment ?? null,
     })
@@ -57,7 +69,7 @@ export async function createPrediction(
 export async function updatePrediction(
   db: Db,
   id: string,
-  patch: UpdatePredictionInput,
+  patch: UpdatePredictionValues,
 ): Promise<Prediction> {
   const values: Partial<typeof predictions.$inferInsert> = {
     updatedAt: new Date().toISOString(),

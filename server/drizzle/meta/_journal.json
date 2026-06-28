@@ -15,6 +15,13 @@
       "when": 1782332251142,
       "tag": "0001_big_wrecking_crew",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1782673334687,
+      "tag": "0002_minor_mikhail_rasputin",
+      "breakpoints": true
     }
   ]
 }

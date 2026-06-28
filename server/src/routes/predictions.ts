@@ -4,7 +4,8 @@ import { getDb } from "../db";
 import { requireAuth } from "../auth/session";
 import { isAcceptingPredictions } from "../domain/season";
 import { findSeasonById } from "../repositories/seasons";
-import { findArtistById } from "../repositories/artists";
+import { resolveExternalArtist } from "../repositories/artists";
+import { resolveExternalSong } from "../repositories/songs";
 import {
   createPrediction,
   updatePrediction,
@@ -52,13 +53,11 @@ predictions.post("/", requireAuth, async (c) => {
     return c.json(errorBody("SEASON_CLOSED", "予想の受付は終了しています"), 403);
   }
 
-  const artist = await findArtistById(db, input.artistId);
-  if (!artist) {
-    return c.json(errorBody("NOT_FOUND", "アーティストが見つかりません"), 404);
-  }
+  // 外部選択をローカルへ解決（find-or-create）。採点は常にローカルidで回る。
+  const artist = await resolveExternalArtist(db, input.artist);
 
   const userId = c.get("userId");
-  const duplicate = await findDuplicate(db, userId, input.seasonId, input.artistId);
+  const duplicate = await findDuplicate(db, userId, input.seasonId, artist.id);
   if (duplicate) {
     return c.json(
       errorBody("CONFLICT", "このアーティストの予想は既に登録されています"),
@@ -66,7 +65,17 @@ predictions.post("/", requireAuth, async (c) => {
     );
   }
 
-  const created = await createPrediction(db, userId, input);
+  const song = input.song
+    ? await resolveExternalSong(db, artist.id, input.song)
+    : null;
+
+  const created = await createPrediction(db, userId, {
+    seasonId: input.seasonId,
+    artistId: artist.id,
+    songId: song?.id ?? null,
+    confidence: input.confidence,
+    comment: input.comment,
+  });
   return c.json(created, 201);
 });
 
@@ -98,8 +107,21 @@ predictions.put("/:id", requireAuth, async (c) => {
   if ("message" in parsed) {
     return c.json(errorBody("VALIDATION_ERROR", parsed.message), 400);
   }
+  const patch = parsed.data;
 
-  const updated = await updatePrediction(db, existing.id, parsed.data);
+  // song が指定されていれば既存アーティスト配下にローカル解決する（null は曲予想を外す）
+  let songId: string | null | undefined;
+  if (patch.song !== undefined) {
+    songId = patch.song
+      ? (await resolveExternalSong(db, existing.artistId, patch.song)).id
+      : null;
+  }
+
+  const updated = await updatePrediction(db, existing.id, {
+    songId,
+    confidence: patch.confidence,
+    comment: patch.comment,
+  });
   return c.json(updated);
 });
 

@@ -28,15 +28,14 @@ async function seedUser(id: string): Promise<string> {
   return id;
 }
 
-async function seedArtist(id: string): Promise<string> {
-  await db.insert(artists).values({ id, name: `artist-${id}` });
-  return id;
-}
+// 外部選択（Spotify）を模した予想ボディ用のアーティスト参照
+const artistRef = (externalId: string) => ({
+  source: "spotify" as const,
+  externalId,
+  name: `artist-${externalId}`,
+});
 
-async function seedSeason(
-  id: string,
-  closeAt: string | null,
-): Promise<string> {
+async function seedSeason(id: string, closeAt: string | null): Promise<string> {
   await db.insert(seasons).values({
     id,
     year: Math.floor(Math.random() * 100000),
@@ -68,24 +67,35 @@ beforeEach(async () => {
 });
 
 describe("POST /api/predictions", () => {
-  it("受付中シーズンへ投稿できる（201）", async () => {
+  it("受付中シーズンへ投稿でき、外部アーティストが自動登録される（201）", async () => {
     const userId = await seedUser("u1");
-    const artistId = await seedArtist("a1");
     const seasonId = await seedSeason("s1", null);
 
     const res = await post(await sessionCookie(userId), {
       seasonId,
-      artistId,
+      artist: artistRef("ext-1"),
       confidence: 3,
     });
 
     expect(res.status).toBe(201);
-    const body = (await res.json()) as { id: string; userId: string };
+    const body = (await res.json()) as {
+      id: string;
+      userId: string;
+      artistId: string;
+    };
     expect(body.userId).toBe(userId);
+    // 外部選択がローカル artists に1行作られている
+    const rows = await db.select().from(artists).all();
+    expect(rows.length).toBe(1);
+    expect(rows[0]!.id).toBe(body.artistId);
   });
 
   it("未ログインは 401", async () => {
-    const res = await post(null, { seasonId: "x", artistId: "y", confidence: 3 });
+    const res = await post(null, {
+      seasonId: "x",
+      artist: artistRef("ext-1"),
+      confidence: 3,
+    });
     expect(res.status).toBe(401);
   });
 
@@ -93,31 +103,31 @@ describe("POST /api/predictions", () => {
     const userId = await seedUser("u1");
     const res = await post(await sessionCookie(userId), {
       seasonId: "s1",
-      artistId: "a1",
+      artist: artistRef("ext-1"),
       confidence: 9,
     });
     expect(res.status).toBe(400);
   });
 
-  it("同一アーティストの二重投稿は 409", async () => {
+  it("同一の外部アーティストの二重投稿は 409", async () => {
     const userId = await seedUser("u1");
-    const artistId = await seedArtist("a1");
     const seasonId = await seedSeason("s1", null);
     const cookie = await sessionCookie(userId);
-    const payload = { seasonId, artistId, confidence: 3 };
+    const payload = { seasonId, artist: artistRef("ext-1"), confidence: 3 };
 
     expect((await post(cookie, payload)).status).toBe(201);
     expect((await post(cookie, payload)).status).toBe(409);
+    // 二重投稿でもアーティスト行は1つに集約される
+    expect((await db.select().from(artists).all()).length).toBe(1);
   });
 
   it("締切済みシーズンへの投稿は 403 SEASON_CLOSED", async () => {
     const userId = await seedUser("u1");
-    const artistId = await seedArtist("a1");
     const seasonId = await seedSeason("s1", "2020-01-01T00:00:00.000Z");
 
     const res = await post(await sessionCookie(userId), {
       seasonId,
-      artistId,
+      artist: artistRef("ext-1"),
       confidence: 3,
     });
     expect(res.status).toBe(403);
@@ -126,15 +136,14 @@ describe("POST /api/predictions", () => {
     });
   });
 
-  it("存在しないアーティストは 404", async () => {
+  it("artist が欠けていれば 400", async () => {
     const userId = await seedUser("u1");
     const seasonId = await seedSeason("s1", null);
     const res = await post(await sessionCookie(userId), {
       seasonId,
-      artistId: "missing",
       confidence: 3,
     });
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(400);
   });
 });
 
@@ -142,12 +151,11 @@ describe("PUT /api/predictions/:id", () => {
   it("他人の予想は 403 FORBIDDEN", async () => {
     const owner = await seedUser("owner");
     const other = await seedUser("other");
-    const artistId = await seedArtist("a1");
     const seasonId = await seedSeason("s1", null);
 
     const created = await post(await sessionCookie(owner), {
       seasonId,
-      artistId,
+      artist: artistRef("ext-1"),
       confidence: 3,
     });
     const { id } = (await created.json()) as { id: string };
@@ -169,11 +177,14 @@ describe("PUT /api/predictions/:id", () => {
 
   it("本人は受付中に編集できる", async () => {
     const owner = await seedUser("owner");
-    const artistId = await seedArtist("a1");
     const seasonId = await seedSeason("s1", null);
     const cookie = await sessionCookie(owner);
 
-    const created = await post(cookie, { seasonId, artistId, confidence: 3 });
+    const created = await post(cookie, {
+      seasonId,
+      artist: artistRef("ext-1"),
+      confidence: 3,
+    });
     const { id } = (await created.json()) as { id: string };
 
     const res = await app.request(
@@ -196,9 +207,12 @@ describe("PUT /api/predictions/:id", () => {
 describe("GET /api/predictions", () => {
   it("seasonId で絞り込める", async () => {
     const userId = await seedUser("u1");
-    const artistId = await seedArtist("a1");
     const seasonId = await seedSeason("s1", null);
-    await post(await sessionCookie(userId), { seasonId, artistId, confidence: 3 });
+    await post(await sessionCookie(userId), {
+      seasonId,
+      artist: artistRef("ext-1"),
+      confidence: 3,
+    });
 
     const res = await app.request(
       `http://localhost/api/predictions?seasonId=${seasonId}`,
