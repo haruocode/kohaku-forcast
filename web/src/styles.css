@@ -51,6 +51,7 @@ body {
 
 .tabs button {
   background: #fff;
+  color: #333;
   border: 1px solid #d6d6dc;
   border-radius: 999px;
   padding: 6px 16px;

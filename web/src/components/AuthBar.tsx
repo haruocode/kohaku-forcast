@@ -13,7 +13,7 @@ export function AuthBar() {
 
   return (
     <header className="authbar">
-      <span className="brand">紅白予想</span>
+      <span className="brand">紅白出場者予想アプリ</span>
       {isLoading ? (
         <span className="muted">…</span>
       ) : me ? (
