@@ -8,7 +8,10 @@ export function AuthBar() {
 
   const logout = async () => {
     await apiPost("/auth/logout");
+    // ユーザー依存のキャッシュを捨ててから、me を即 null にして画面を確実に切り替える
+    // （再フェッチ任せにせず、タイミング依存をなくす）。
     qc.clear();
+    qc.setQueryData(["me"], null);
   };
 
   return (

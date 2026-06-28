@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPost, apiSend, ApiError } from "../../lib/api";
+import { apiGet, apiPost, apiSend, ApiError, loginUrl } from "../../lib/api";
 import type {
   ExternalArtist,
   ExternalTrack,
@@ -220,7 +220,9 @@ export function PredictionsPanel({ me }: { me: User | null }) {
         予想（{season.year}）{season.isOpen ? "" : "｜受付終了"}
       </h2>
       {!me ? (
-        <p className="muted">予想するにはログインしてください。</p>
+        <p className="muted">
+          予想には<a href={loginUrl}>ログイン</a>してください。
+        </p>
       ) : !season.isOpen ? (
         <p className="muted">この回の受付は終了しています。</p>
       ) : artist ? (

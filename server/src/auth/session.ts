@@ -28,9 +28,15 @@ export async function issueSession(c: Context<Env>, userId: string): Promise<voi
   });
 }
 
-/** セッションCookieを破棄する */
+/** セッションCookieを破棄する。
+ * 発行時（issueSession）と同じ属性を付けないと、ブラウザが削除Cookieを
+ * 既存のものと一致と見なさず消えないことがある（特に本番の Secure Cookie）。 */
 export function clearSession(c: Context<Env>): void {
-  deleteCookie(c, SESSION_COOKIE, { path: "/" });
+  deleteCookie(c, SESSION_COOKIE, {
+    path: "/",
+    secure: isSecure(c),
+    sameSite: "Lax",
+  });
 }
 
 /** セッションCookieを検証し、有効ならユーザーIDを返す（無効なら null） */
