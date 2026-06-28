@@ -7,6 +7,14 @@ export const ARTIST_POINTS = 10;
 export const SONG_POINTS = 20;
 /** 早押し最大ボーナス（最速の的中が基礎点の最大 1 + この値 倍になる） */
 export const EARLY_BIRD_MAX_BONUS = 0.5;
+/**
+ * 外れ（予想したアーティストが未出場）の減点。
+ * アーティスト的中 +10 と対称（損益分岐＝出場確率50%）にし、
+ * 「来ると確信できるアーティストだけ予想する」のが最適になるようにする。
+ * むやみに数を撒くと外れ分でマイナスになり、撃ち得を防ぐ。
+ * 早押し倍率は掛けない（正の点のみ早さで伸びる）。
+ */
+export const MISS_PENALTY = 10;
 
 /** 採点対象の予想（必要な項目のみ） */
 export type PredictionInput = {
@@ -100,7 +108,9 @@ export function isScorable(
 
 /**
  * 予想1件の最終点（小数）を返す。
- * 不正投票（発表後の投稿・編集）は採点対象外で常に 0。
+ * - 不正投票（発表後の投稿・編集）は採点対象外で常に 0。
+ * - 的中（出場）→ 基礎点 × 早押し倍率（正の点）。
+ * - 外れ（未出場）→ -missPenalty（フラット。早押し倍率は掛けない）。
  * 表示時は displayScore() で整数に四捨五入する。
  */
 export function scorePrediction(
@@ -108,10 +118,11 @@ export function scorePrediction(
   result: ResultInput,
   window: SeasonWindow,
   maxBonus: number = EARLY_BIRD_MAX_BONUS,
+  missPenalty: number = MISS_PENALTY,
 ): number {
   if (!isScorable(prediction, window)) return 0;
   const base = baseScore(prediction, result);
-  if (base === 0) return 0;
+  if (base === 0) return -missPenalty;
   const e = earlinessFactor(prediction.updatedAt, window);
   return base * earlyBirdMultiplier(e, maxBonus);
 }

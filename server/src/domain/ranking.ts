@@ -4,6 +4,7 @@
 import {
   scorePrediction,
   EARLY_BIRD_MAX_BONUS,
+  MISS_PENALTY,
   type SeasonWindow,
   type ResultInput,
 } from "./scoring";
@@ -38,6 +39,7 @@ export function computeRanking(
   results: ResultsByArtist,
   window: SeasonWindow,
   maxBonus: number = EARLY_BIRD_MAX_BONUS,
+  missPenalty: number = MISS_PENALTY,
 ): RankEntry[] {
   const byUser = new Map<string, Acc>();
 
@@ -48,6 +50,7 @@ export function computeRanking(
       result,
       window,
       maxBonus,
+      missPenalty,
     );
 
     const acc =

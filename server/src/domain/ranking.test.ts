@@ -47,10 +47,28 @@ describe("computeRanking", () => {
     expect(entries[1]!.rank).toBe(2);
   });
 
-  it("外れ予想はスコア0・的中件数に含めない", () => {
+  it("外れ予想は減点（-10）・的中件数には含めない", () => {
     const entries = computeRanking([pred("u1", "a2", null)], results, window);
-    expect(entries[0]!.totalScore).toBe(0);
+    expect(entries[0]!.totalScore).toBe(-10);
     expect(entries[0]!.hitCount).toBe(0);
+  });
+
+  it("撒き得を防ぐ: 的中1件でも外れを多く撒くと合計はマイナスになりうる", () => {
+    // a1 的中(+30) を1件 / a2 外れ(-10) を3件 → 30 - 30 = 0、さらに外れが増えれば負に
+    const entries = computeRanking(
+      [
+        pred("spammer", "a1", "s1"),
+        pred("spammer", "a2", null),
+        pred("spammer", "a2b", null),
+        pred("spammer", "a2c", null),
+        pred("spammer", "a2d", null),
+      ],
+      results,
+      window,
+    );
+    // 的中は1件のみ（hitCount=1）、外れ4件で 30 - 40 = -10
+    expect(entries[0]!.hitCount).toBe(1);
+    expect(Math.round(entries[0]!.totalScore)).toBe(-10);
   });
 
   it("同点なら的中件数の多い方が上位", () => {

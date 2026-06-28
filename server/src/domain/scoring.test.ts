@@ -6,6 +6,7 @@ import {
   isScorable,
   scorePrediction,
   displayScore,
+  EARLY_BIRD_MAX_BONUS,
   type SeasonWindow,
   type PredictionInput,
 } from "./scoring";
@@ -146,14 +147,49 @@ describe("scorePrediction（最終点 / 早押し込み）", () => {
     ).toBe(15);
   });
 
-  it("外れ（未出場）→ 0", () => {
+  it("外れ（未出場）→ -10（減点）", () => {
     expect(
       scorePrediction(at(openAt), { appeared: false, actualSongId: null }, window),
+    ).toBe(-10);
+  });
+
+  it("外れの減点は早押し倍率の影響を受けずフラット（最速でも -10）", () => {
+    const miss = { appeared: false, actualSongId: null } as const;
+    expect(scorePrediction(at(openAt), miss, window)).toBe(-10);
+    expect(scorePrediction(at(midAt), miss, window)).toBe(-10);
+  });
+
+  it("結果なし（null）も未出場扱いで -10", () => {
+    expect(scorePrediction(at(openAt), null, window)).toBe(-10);
+  });
+
+  it("出場はしたが曲が外れ → 減点なし（+10 を維持）", () => {
+    expect(
+      scorePrediction(at(midAt), { appeared: true, actualSongId: "song-2" }, window),
+    ).toBeCloseTo(12.5, 5); // 10 × 1.25
+  });
+
+  it("締切後の投稿は的中でも 0（不正投票・外れでも減点しない）", () => {
+    expect(scorePrediction(at(afterCloseAt), matched, window)).toBe(0);
+    expect(
+      scorePrediction(
+        at(afterCloseAt),
+        { appeared: false, actualSongId: null },
+        window,
+      ),
     ).toBe(0);
   });
 
-  it("締切後の投稿は的中でも 0（不正投票）", () => {
-    expect(scorePrediction(at(afterCloseAt), matched, window)).toBe(0);
+  it("missPenalty は引数で上書きできる", () => {
+    expect(
+      scorePrediction(
+        at(openAt),
+        { appeared: false, actualSongId: null },
+        window,
+        EARLY_BIRD_MAX_BONUS,
+        5,
+      ),
+    ).toBe(-5);
   });
 });
 
