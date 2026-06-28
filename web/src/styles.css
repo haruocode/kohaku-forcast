@@ -43,6 +43,44 @@ body {
   border-radius: 50%;
 }
 
+/* 表示名の編集 */
+.name-btn {
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.name-btn:hover {
+  background: #f0f0f3;
+}
+
+.edit-pencil {
+  opacity: 0.45;
+  font-size: 12px;
+}
+
+.name-edit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.name-input {
+  display: inline-block;
+  width: 150px;
+  margin: 0;
+  padding: 5px 8px;
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
 .tabs {
   display: flex;
   gap: 8px;
@@ -151,6 +189,30 @@ a.btn {
   border-radius: 2px;
   object-fit: cover;
   margin-right: 8px;
+}
+
+.result-pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.result-thumb {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 2px;
+  object-fit: cover;
+}
+
+.thumb-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0f0f3;
+  color: #aaa;
+  font-size: 16px;
 }
 
 .badge {

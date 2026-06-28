@@ -16,6 +16,21 @@ export async function findUsersByIds(db: Db, ids: string[]): Promise<User[]> {
   return db.select().from(users).where(inArray(users.id, ids)).all();
 }
 
+/** 表示名を変更する */
+export async function updateDisplayName(
+  db: Db,
+  userId: string,
+  displayName: string,
+): Promise<User> {
+  const nowIso = new Date().toISOString();
+  return db
+    .update(users)
+    .set({ displayName, updatedAt: nowIso })
+    .where(eq(users.id, userId))
+    .returning()
+    .get();
+}
+
 /** ウォレットアドレスを設定する（所有確認済みの時刻も記録） */
 export async function setWalletAddress(
   db: Db,
@@ -48,11 +63,12 @@ export async function upsertUserByGoogleSub(
   const nowIso = new Date().toISOString();
 
   if (existing) {
+    // 表示名はユーザーが変更できるため、再ログイン時に Google 名で上書きしない。
+    // （初回作成時のみ Google 名を採用する。）
     const updated = await db
       .update(users)
       .set({
         email: profile.email,
-        displayName: profile.name ?? existing.displayName,
         avatarUrl: profile.picture ?? existing.avatarUrl,
         updatedAt: nowIso,
       })

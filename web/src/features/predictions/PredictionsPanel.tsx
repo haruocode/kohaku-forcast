@@ -29,7 +29,7 @@ function ArtistSearch({ onPick }: { onPick: (a: ExternalArtist) => void }) {
   return (
     <div>
       <input
-        placeholder="アーティスト名で検索（Spotify / MusicBrainz）"
+        placeholder="アーティスト名で検索"
         value={q}
         onChange={(e) => setQ(e.target.value)}
       />
@@ -37,10 +37,13 @@ function ArtistSearch({ onPick }: { onPick: (a: ExternalArtist) => void }) {
       <ul className="result-list">
         {(data ?? []).map((a) => (
           <li key={`${a.source}:${a.externalId}`}>
-            <button onClick={() => onPick(a)}>
-              {a.name}
-              {a.detail ? <span className="muted">（{a.detail}）</span> : null}
-              <span className="muted"> · {a.source}</span>
+            <button className="result-pick" onClick={() => onPick(a)}>
+              {a.imageUrl ? (
+                <img className="result-thumb" src={a.imageUrl} alt="" />
+              ) : (
+                <span className="result-thumb thumb-placeholder">♪</span>
+              )}
+              <span>{a.name}</span>
             </button>
           </li>
         ))}

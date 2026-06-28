@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
+import { z } from "zod";
 import {
   buildAuthorizationUrl,
   exchangeCodeForProfile,
@@ -10,9 +11,17 @@ import {
   requireAuth,
 } from "../auth/session";
 import { getDb } from "../db";
-import { upsertUserByGoogleSub, findUserById } from "../repositories/users";
+import {
+  upsertUserByGoogleSub,
+  findUserById,
+  updateDisplayName,
+} from "../repositories/users";
 import { errorBody } from "../lib/http";
 import type { Bindings, Variables } from "../types/env";
+
+const updateProfileSchema = z.object({
+  displayName: z.string().trim().min(1, "表示名を入力してください").max(50),
+});
 
 const OAUTH_STATE_COOKIE = "oauth_state";
 
@@ -77,6 +86,22 @@ auth.post("/logout", (c) => {
   return c.json({ ok: true });
 });
 
+type MeUser = {
+  id: string;
+  displayName: string;
+  email: string;
+  avatarUrl: string | null;
+  isAdmin: boolean;
+};
+
+const meResponse = (u: MeUser) => ({
+  id: u.id,
+  displayName: u.displayName,
+  email: u.email,
+  avatarUrl: u.avatarUrl,
+  isAdmin: u.isAdmin,
+});
+
 // 現在のログインユーザー
 auth.get("/me", requireAuth, async (c) => {
   const db = getDb(c.env.DB);
@@ -84,13 +109,22 @@ auth.get("/me", requireAuth, async (c) => {
   if (!user) {
     return c.json(errorBody("NOT_FOUND", "ユーザーが見つかりません"), 404);
   }
-  return c.json({
-    id: user.id,
-    displayName: user.displayName,
-    email: user.email,
-    avatarUrl: user.avatarUrl,
-    isAdmin: user.isAdmin,
-  });
+  return c.json(meResponse(user));
+});
+
+// 表示名の変更
+auth.patch("/me", requireAuth, async (c) => {
+  const raw = await c.req.json().catch(() => null);
+  const parsed = updateProfileSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json(
+      errorBody("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "入力が不正です"),
+      400,
+    );
+  }
+  const db = getDb(c.env.DB);
+  const user = await updateDisplayName(db, c.get("userId"), parsed.data.displayName);
+  return c.json(meResponse(user));
 });
 
 export default auth;
