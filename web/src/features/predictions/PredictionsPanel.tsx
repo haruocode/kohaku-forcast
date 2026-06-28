@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost, apiSend, ApiError, loginUrl } from "../../lib/api";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import type {
   ExternalArtist,
   ExternalTrack,
@@ -179,9 +180,14 @@ function PredictionList({ season, me }: { season: Season; me: User | null }) {
     queryFn: () => apiGet<Prediction[]>(`/predictions?seasonId=${season.id}`),
   });
 
+  const [pendingDelete, setPendingDelete] = useState<Prediction | null>(null);
+
   const remove = useMutation({
     mutationFn: (id: string) => apiSend<{ ok: boolean }>("DELETE", `/predictions/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["predictions"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["predictions"] });
+      setPendingDelete(null);
+    },
   });
 
   const list = data ?? [];
@@ -225,15 +231,7 @@ function PredictionList({ season, me }: { season: Season; me: User | null }) {
                   <button
                     className="ghost danger cancel-btn"
                     disabled={removing}
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          `「${p.artistName ?? "この予想"}」の予想を取り消しますか？`,
-                        )
-                      ) {
-                        remove.mutate(p.id);
-                      }
-                    }}
+                    onClick={() => setPendingDelete(p)}
                   >
                     {removing ? "取消中…" : "取り消す"}
                   </button>
@@ -243,6 +241,22 @@ function PredictionList({ season, me }: { season: Season; me: User | null }) {
           })}
         </ul>
       )}
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="予想を取り消しますか？"
+        description={
+          pendingDelete
+            ? `「${pendingDelete.artistName ?? "この予想"}」の予想を取り消します。この操作は元に戻せません。`
+            : ""
+        }
+        confirmLabel="取り消す"
+        cancelLabel="やめる"
+        destructive
+        busy={remove.isPending}
+        onConfirm={() => pendingDelete && remove.mutate(pendingDelete.id)}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }
