@@ -1,8 +1,16 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { env } from "cloudflare:test";
+import { sign } from "hono/jwt";
 import app from "../index";
 import { getDb } from "../db";
-import { users, artists, songs, seasons, predictions, results } from "../db/schema";
+import {
+  users,
+  artists,
+  songs,
+  seasons,
+  predictions,
+  results,
+} from "../db/schema";
 
 const db = getDb(env.DB);
 
@@ -16,9 +24,24 @@ beforeEach(async () => {
 
 const get = (path: string) => app.request(`http://localhost${path}`, {}, env);
 
+async function sessionCookie(userId: string): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const token = await sign(
+    { sub: userId, iat: now, exp: now + 3600 },
+    env.SESSION_SECRET,
+    "HS256",
+  );
+  return `session=${token}`;
+}
+
+const getAuthed = (path: string, cookie: string) =>
+  app.request(`http://localhost${path}`, { headers: { cookie } }, env);
+
 describe("GET /api/rankings/:seasonId", () => {
   it("締切前は 409", async () => {
-    await db.insert(seasons).values({ id: "s1", year: 2026, predictionCloseAt: null });
+    await db
+      .insert(seasons)
+      .values({ id: "s1", year: 2026, predictionCloseAt: null });
     const res = await get("/api/rankings/s1");
     expect(res.status).toBe(409);
   });
@@ -29,11 +52,18 @@ describe("GET /api/rankings/:seasonId", () => {
 
   it("確定後はスコア順にランキングを返す", async () => {
     await db.insert(users).values([
-      { id: "u1", displayName: "ヨネヅ予想", email: "u1@e.com", googleSub: "g1" },
+      {
+        id: "u1",
+        displayName: "ヨネヅ予想",
+        email: "u1@e.com",
+        googleSub: "g1",
+      },
       { id: "u2", displayName: "出場のみ", email: "u2@e.com", googleSub: "g2" },
     ]);
     await db.insert(artists).values({ id: "a1", name: "米津玄師" });
-    await db.insert(songs).values({ id: "song-1", artistId: "a1", title: "Lemon" });
+    await db
+      .insert(songs)
+      .values({ id: "song-1", artistId: "a1", title: "Lemon" });
     await db.insert(seasons).values({
       id: "s1",
       year: 2026,
@@ -82,8 +112,18 @@ describe("GET /api/rankings/:seasonId", () => {
       hitCount: number;
     }[];
 
-    expect(rows[0]).toMatchObject({ rank: 1, userId: "u1", score: 30, hitCount: 1 });
-    expect(rows[1]).toMatchObject({ rank: 2, userId: "u2", score: 10, hitCount: 1 });
+    expect(rows[0]).toMatchObject({
+      rank: 1,
+      userId: "u1",
+      score: 30,
+      hitCount: 1,
+    });
+    expect(rows[1]).toMatchObject({
+      rank: 2,
+      userId: "u2",
+      score: 10,
+      hitCount: 1,
+    });
     expect(rows[0]!.displayName).toBe("ヨネヅ予想");
   });
 });
@@ -95,7 +135,9 @@ describe("GET /api/rankings/overall", () => {
       { id: "u2", displayName: "新顔", email: "u2@e.com", googleSub: "g2" },
     ]);
     await db.insert(artists).values({ id: "a1", name: "米津玄師" });
-    await db.insert(songs).values({ id: "song-1", artistId: "a1", title: "Lemon" });
+    await db
+      .insert(songs)
+      .values({ id: "song-1", artistId: "a1", title: "Lemon" });
     await db.insert(seasons).values([
       {
         id: "s2025",
@@ -116,10 +158,37 @@ describe("GET /api/rankings/overall", () => {
     const late2026 = "2026-11-30T23:00:00.000Z";
     await db.insert(predictions).values([
       // u1: 2025 出場のみ的中(+10) + 2026 両的中(+30) = 40
-      { id: "p1", userId: "u1", seasonId: "s2025", artistId: "a1", songId: null, confidence: 3, createdAt: late2025, updatedAt: late2025 },
-      { id: "p2", userId: "u1", seasonId: "s2026", artistId: "a1", songId: "song-1", confidence: 5, createdAt: late2026, updatedAt: late2026 },
+      {
+        id: "p1",
+        userId: "u1",
+        seasonId: "s2025",
+        artistId: "a1",
+        songId: null,
+        confidence: 3,
+        createdAt: late2025,
+        updatedAt: late2025,
+      },
+      {
+        id: "p2",
+        userId: "u1",
+        seasonId: "s2026",
+        artistId: "a1",
+        songId: "song-1",
+        confidence: 5,
+        createdAt: late2026,
+        updatedAt: late2026,
+      },
       // u2: 2026 出場のみ的中(+10) = 10
-      { id: "p3", userId: "u2", seasonId: "s2026", artistId: "a1", songId: null, confidence: 3, createdAt: late2026, updatedAt: late2026 },
+      {
+        id: "p3",
+        userId: "u2",
+        seasonId: "s2026",
+        artistId: "a1",
+        songId: null,
+        confidence: 3,
+        createdAt: late2026,
+        updatedAt: late2026,
+      },
     ]);
     await db.insert(results).values([
       { seasonId: "s2025", artistId: "a1", appeared: true, songId: "song-1" },
@@ -134,14 +203,109 @@ describe("GET /api/rankings/overall", () => {
       score: number;
       hitCount: number;
     }[];
-    expect(rows[0]).toMatchObject({ rank: 1, userId: "u1", score: 40, hitCount: 2 });
-    expect(rows[1]).toMatchObject({ rank: 2, userId: "u2", score: 10, hitCount: 1 });
+    expect(rows[0]).toMatchObject({
+      rank: 1,
+      userId: "u1",
+      score: 40,
+      hitCount: 2,
+    });
+    expect(rows[1]).toMatchObject({
+      rank: 2,
+      userId: "u2",
+      score: 10,
+      hitCount: 1,
+    });
   });
 
   it("締切済みシーズンが無ければ空配列", async () => {
-    await db.insert(seasons).values({ id: "sOpen", year: 2027, predictionCloseAt: null });
+    await db
+      .insert(seasons)
+      .values({ id: "sOpen", year: 2027, predictionCloseAt: null });
     const res = await get("/api/rankings/overall");
     expect(res.status).toBe(200);
     expect((await res.json()) as unknown[]).toEqual([]);
+  });
+});
+
+describe("GET /api/rankings/me", () => {
+  it("未ログインは 401", async () => {
+    expect((await get("/api/rankings/me")).status).toBe(401);
+  });
+
+  it("自分の通算ポイント・順位を返す", async () => {
+    await db.insert(users).values([
+      { id: "u1", displayName: "常連", email: "u1@e.com", googleSub: "g1" },
+      { id: "u2", displayName: "新顔", email: "u2@e.com", googleSub: "g2" },
+    ]);
+    await db.insert(artists).values({ id: "a1", name: "米津玄師" });
+    await db
+      .insert(songs)
+      .values({ id: "song-1", artistId: "a1", title: "Lemon" });
+    await db.insert(seasons).values({
+      id: "s2026",
+      year: 2026,
+      predictionOpenAt: "2026-11-01T00:00:00.000Z",
+      predictionCloseAt: "2026-12-01T00:00:00.000Z",
+    });
+    const late = "2026-11-30T23:00:00.000Z";
+    await db.insert(predictions).values([
+      // u1: 両的中(+30)、u2: 出場のみ的中(+10)
+      {
+        id: "p1",
+        userId: "u1",
+        seasonId: "s2026",
+        artistId: "a1",
+        songId: "song-1",
+        confidence: 5,
+        createdAt: late,
+        updatedAt: late,
+      },
+      {
+        id: "p2",
+        userId: "u2",
+        seasonId: "s2026",
+        artistId: "a1",
+        songId: null,
+        confidence: 3,
+        createdAt: late,
+        updatedAt: late,
+      },
+    ]);
+    await db
+      .insert(results)
+      .values({
+        seasonId: "s2026",
+        artistId: "a1",
+        appeared: true,
+        songId: "song-1",
+      });
+
+    const res = await getAuthed("/api/rankings/me", await sessionCookie("u2"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      score: 10,
+      rank: 2,
+      hitCount: 1,
+      totalUsers: 2,
+    });
+  });
+
+  it("締切済みシーズンでの予想が無ければ 0 ポイント", async () => {
+    await db
+      .insert(users)
+      .values({
+        id: "u1",
+        displayName: "未参加",
+        email: "u1@e.com",
+        googleSub: "g1",
+      });
+    const res = await getAuthed("/api/rankings/me", await sessionCookie("u1"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      score: 0,
+      rank: null,
+      hitCount: 0,
+      totalUsers: 0,
+    });
   });
 });

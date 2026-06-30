@@ -1,1 +1,0 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/components/authbar.tsx","./src/components/confirmdialog.tsx","./src/features/predictions/predictionspanel.tsx","./src/features/rankings/rankingspanel.tsx","./src/hooks/useme.ts","./src/lib/api.ts","./src/lib/types.ts"],"version":"5.9.3"}

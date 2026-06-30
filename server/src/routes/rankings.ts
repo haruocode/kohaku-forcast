@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { getDb } from "../db";
 import type { Db } from "../db";
+import { requireAuth } from "../auth/session";
 import { displayScore } from "../domain/scoring";
 import {
   computeRanking,
@@ -61,20 +62,38 @@ async function withDisplayNames(db: Db, ranked: RankEntry[]) {
   }));
 }
 
+/** 締切済み全シーズンを合算した通算ランキングを返す */
+async function computeOverall(db: Db): Promise<RankEntry[]> {
+  const closedSeasons = (await listSeasons(db)).filter(
+    (s) => s.predictionCloseAt !== null,
+  );
+  const seasonRankings = await Promise.all(
+    closedSeasons.map((s) => rankSeason(db, s)),
+  );
+  return combineRankings(seasonRankings);
+}
+
 // 通算ランキング（結果確定済み＝締切済み全シーズンのスコア合算）。
 // /:seasonId より先に登録する（"overall" がパスパラメータに食われないように）。
 rankings.get("/overall", async (c) => {
   const db = getDb(c.env.DB);
-  const closedSeasons = (await listSeasons(db)).filter(
-    (s) => s.predictionCloseAt !== null,
-  );
-
-  const seasonRankings = await Promise.all(
-    closedSeasons.map((s) => rankSeason(db, s)),
-  );
-  const overall = combineRankings(seasonRankings);
-
+  const overall = await computeOverall(db);
   return c.json(await withDisplayNames(db, overall));
+});
+
+// ログインユーザー自身の通算ポイント・順位（ヘッダー表示用）。
+// 未参加（締切済みシーズンでの予想なし）でも 0 ポイントとして返す。
+rankings.get("/me", requireAuth, async (c) => {
+  const db = getDb(c.env.DB);
+  const userId = c.get("userId");
+  const overall = await computeOverall(db);
+  const mine = overall.find((e) => e.userId === userId);
+  return c.json({
+    score: mine ? displayScore(mine.totalScore) : 0,
+    rank: mine?.rank ?? null,
+    hitCount: mine?.hitCount ?? 0,
+    totalUsers: overall.length,
+  });
 });
 
 // シーズンのランキング（結果確定後）

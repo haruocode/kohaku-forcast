@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 .wrangler/
+*.tsbuildinfo
 
 # Secrets / local env (never commit)
 .dev.vars

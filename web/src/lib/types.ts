@@ -51,6 +51,13 @@ export type RankingRow = {
   hitCount: number;
 };
 
+export type MyPoints = {
+  score: number;
+  rank: number | null;
+  hitCount: number;
+  totalUsers: number;
+};
+
 export type ExternalSource = "spotify" | "musicbrainz";
 
 export type ExternalArtist = {

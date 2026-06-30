@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMe } from "../hooks/useMe";
+import { useMyPoints } from "../hooks/useMyPoints";
 import { apiPost, apiSend, ApiError, loginUrl } from "../lib/api";
 import type { User } from "../lib/types";
 
 export function AuthBar() {
   const { data: me, isLoading } = useMe();
+  const { data: points } = useMyPoints(!!me);
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState("");
@@ -47,6 +49,18 @@ export function AuthBar() {
         <span className="muted">…</span>
       ) : me ? (
         <span className="authbar-right">
+          {points && (
+            <span
+              className="points"
+              title={
+                points.rank
+                  ? `通算 ${points.rank}位 / ${points.totalUsers}人・的中 ${points.hitCount}件`
+                  : "まだ通算ポイントはありません"
+              }
+            >
+              🏅 {points.score} pt
+            </span>
+          )}
           {me.avatarUrl && <img className="avatar" src={me.avatarUrl} alt="" />}
           {editing ? (
             <span className="name-edit">

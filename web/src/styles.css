@@ -43,6 +43,19 @@ body {
   border-radius: 50%;
 }
 
+.points {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #fff4d6;
+  color: #8a5a00;
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
 /* 表示名の編集 */
 .name-btn {
   background: none;
