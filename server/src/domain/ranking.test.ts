@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   computeRanking,
+  combineRankings,
   type RankablePrediction,
+  type RankEntry,
   type ResultsByArtist,
 } from "./ranking";
 import type { SeasonWindow } from "./scoring";
@@ -140,5 +142,43 @@ describe("computeRanking", () => {
     );
     expect(entries[0]!.userId).toBe("early");
     expect(Math.round(entries[0]!.totalScore)).toBe(45);
+  });
+});
+
+describe("combineRankings", () => {
+  const entry = (
+    userId: string,
+    totalScore: number,
+    hitCount: number,
+    earliestAt: string,
+  ): RankEntry => ({ rank: 0, userId, totalScore, hitCount, earliestAt });
+
+  it("複数シーズンのスコア・的中件数を合算し、最も早い投稿を残す", () => {
+    const overall = combineRankings([
+      // 2025
+      [entry("u1", 30, 1, "2025-11-10T00:00:00.000Z")],
+      // 2026
+      [
+        entry("u1", 10, 1, "2026-11-05T00:00:00.000Z"),
+        entry("u2", 50, 2, "2026-11-02T00:00:00.000Z"),
+      ],
+    ]);
+    const u1 = overall.find((e) => e.userId === "u1")!;
+    const u2 = overall.find((e) => e.userId === "u2")!;
+    expect(u1.totalScore).toBe(40);
+    expect(u1.hitCount).toBe(2);
+    expect(u1.earliestAt).toBe("2025-11-10T00:00:00.000Z");
+    // 通算は u2(50) > u1(40)
+    expect(overall.map((e) => e.userId)).toEqual(["u2", "u1"]);
+    expect(u2.rank).toBe(1);
+    expect(u1.rank).toBe(2);
+  });
+
+  it("通算スコアはマイナスも許容する", () => {
+    const overall = combineRankings([
+      [entry("u1", -10, 0, "2025-11-10T00:00:00.000Z")],
+      [entry("u1", -20, 0, "2026-11-10T00:00:00.000Z")],
+    ]);
+    expect(overall[0]!.totalScore).toBe(-30);
   });
 });

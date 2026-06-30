@@ -4,7 +4,6 @@ export type User = {
   email: string;
   avatarUrl: string | null;
   isAdmin: boolean;
-  solanaAddress?: string | null;
 };
 
 export type Season = {
@@ -69,15 +68,4 @@ export type ExternalTrack = {
   title: string;
   artistName: string;
   releaseYear: number | null;
-};
-
-export type WalletChallenge = { message: string; challenge: string };
-
-export type TokenAward = {
-  id: string;
-  seasonId: string;
-  seasonYear: number;
-  amount: number;
-  status: "pending" | "sent" | "failed";
-  txSignature: string | null;
 };

@@ -43,19 +43,13 @@
 
 ### rankings（ランキング）
 
+- [GET /api/rankings/overall](./rankings/GET-overall.md)
 - [GET /api/rankings/:seasonId](./rankings/GET-seasonId.md)
-
-### wallet（ウォレット・記念トークン）
-
-- [POST /api/wallet/challenge](./wallet/POST-challenge.md)
-- [POST /api/wallet/link](./wallet/POST-link.md)
-- [GET /api/wallet/awards](./wallet/GET-awards.md)
 
 ### admin（管理／要管理者）
 
 - [POST /api/admin/seasons](./admin/POST-seasons.md)
 - [POST /api/admin/seasons/:id/close](./admin/POST-seasons-id-close.md)
-- [POST /api/admin/seasons/:id/distribute](./admin/POST-seasons-id-distribute.md)
 - [POST /api/admin/results](./admin/POST-results.md)
 - [POST /api/admin/artists](./admin/POST-artists.md)
 - [POST /api/admin/songs](./admin/POST-songs.md)

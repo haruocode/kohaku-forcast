@@ -102,6 +102,28 @@ body {
   color: #fff;
 }
 
+.subtabs {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.subtabs button {
+  background: #fff;
+  color: #555;
+  border: 1px solid #d6d6dc;
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.subtabs button.active {
+  background: #333;
+  border-color: #333;
+  color: #fff;
+}
+
 .panel {
   background: #fff;
   border: 1px solid #e3e3e8;

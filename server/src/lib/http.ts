@@ -6,7 +6,6 @@ export type ErrorCode =
   | "NOT_FOUND"
   | "CONFLICT"
   | "SEASON_CLOSED"
-  | "NOT_CONFIGURED"
   | "INTERNAL";
 
 export const errorBody = (code: ErrorCode, message: string) => ({

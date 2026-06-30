@@ -22,9 +22,7 @@ tags:
   - name: predictions
     description: 予想
   - name: rankings
-    description: ランキング
-  - name: wallet
-    description: ウォレット連携・記念トークン
+    description: ランキング（シーズン / 通算）
   - name: admin
     description: 管理（要管理者）
   - name: system
@@ -312,6 +310,20 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/rankings/overall:
+    get:
+      tags: [rankings]
+      summary: 通算ランキング（締切済み全シーズン合算）
+      security: []
+      responses:
+        "200":
+          description: OK（締切済みシーズンが無ければ空配列）
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/RankingRow" }
+
   /api/rankings/{seasonId}:
     get:
       tags: [rankings]
@@ -329,60 +341,6 @@ paths:
                 items: { $ref: "#/components/schemas/RankingRow" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
-
-  /api/wallet/challenge:
-    post:
-      tags: [wallet]
-      summary: ウォレット連携チャレンジ発行
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/WalletChallenge" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-
-  /api/wallet/link:
-    post:
-      tags: [wallet]
-      summary: 署名検証してウォレット連携
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [address, signature, challenge]
-              properties:
-                address: { type: string, description: base58 Solanaアドレス }
-                signature: { type: string, description: base58 ed25519署名 }
-                challenge: { type: string }
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  address: { type: string, nullable: true }
-                  walletVerifiedAt: { type: string, nullable: true }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-
-  /api/wallet/awards:
-    get:
-      tags: [wallet]
-      summary: 自分の記念トークン一覧
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/TokenAward" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
 
   /api/admin/seasons:
     post:
@@ -435,28 +393,6 @@ paths:
         "400": { $ref: "#/components/responses/ValidationError" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
-
-  /api/admin/seasons/{id}/distribute:
-    post:
-      tags: [admin]
-      summary: 記念トークン配布（締切後・冪等）
-      parameters:
-        - { name: id, in: path, required: true, schema: { type: string } }
-      responses:
-        "200":
-          description: 配布サマリ
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  total: { type: integer }
-                  sent: { type: integer }
-                  skipped: { type: integer }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "409": { $ref: "#/components/responses/Conflict" }
-        "501": { $ref: "#/components/responses/NotConfigured" }
 
   /api/admin/results:
     post:
@@ -725,20 +661,6 @@ components:
         displayName: { type: string }
         score: { type: integer }
         hitCount: { type: integer }
-    WalletChallenge:
-      type: object
-      properties:
-        message: { type: string }
-        challenge: { type: string }
-    TokenAward:
-      type: object
-      properties:
-        id: { type: string }
-        seasonId: { type: string }
-        seasonYear: { type: integer }
-        amount: { type: integer }
-        status: { type: string, enum: [pending, sent, failed] }
-        txSignature: { type: string, nullable: true }
 
   responses:
     ValidationError:
@@ -768,11 +690,6 @@ components:
           schema: { $ref: "#/components/schemas/Error" }
     Conflict:
       description: 重複 / 前提未充足（CONFLICT）
-      content:
-        application/json:
-          schema: { $ref: "#/components/schemas/Error" }
-    NotConfigured:
-      description: 機能が未設定（NOT_CONFIGURED）
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }

@@ -2,10 +2,9 @@ import { useState } from "react";
 import { AuthBar } from "./components/AuthBar";
 import { PredictionsPanel } from "./features/predictions/PredictionsPanel";
 import { RankingsPanel } from "./features/rankings/RankingsPanel";
-import { WalletPanel } from "./features/wallet/WalletPanel";
 import { useMe } from "./hooks/useMe";
 
-type Tab = "predict" | "ranking" | "wallet";
+type Tab = "predict" | "ranking";
 
 export function App() {
   const { data: me = null } = useMe();
@@ -21,14 +20,10 @@ export function App() {
         <button className={tab === "ranking" ? "active" : ""} onClick={() => setTab("ranking")}>
           ランキング
         </button>
-        <button className={tab === "wallet" ? "active" : ""} onClick={() => setTab("wallet")}>
-          ウォレット
-        </button>
       </nav>
       <main>
         {tab === "predict" && <PredictionsPanel me={me} />}
         {tab === "ranking" && <RankingsPanel />}
-        {tab === "wallet" && <WalletPanel me={me} />}
       </main>
     </div>
   );

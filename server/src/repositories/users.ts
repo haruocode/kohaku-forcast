@@ -31,21 +31,6 @@ export async function updateDisplayName(
     .get();
 }
 
-/** ウォレットアドレスを設定する（所有確認済みの時刻も記録） */
-export async function setWalletAddress(
-  db: Db,
-  userId: string,
-  address: string,
-): Promise<User> {
-  const nowIso = new Date().toISOString();
-  return db
-    .update(users)
-    .set({ solanaAddress: address, walletVerifiedAt: nowIso, updatedAt: nowIso })
-    .where(eq(users.id, userId))
-    .returning()
-    .get();
-}
-
 /**
  * google_sub でユーザーを照合し、無ければ作成する（あれば最新プロフィールに更新）。
  * 同一ユーザーの識別はメールではなく google_sub を正とする。

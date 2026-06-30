@@ -6,12 +6,10 @@ import { findSeasonById, closeSeason, createSeason } from "../repositories/seaso
 import { createArtist, findArtistById } from "../repositories/artists";
 import { createSong } from "../repositories/songs";
 import { upsertResults } from "../repositories/results";
-import { distributeSeasonTokens } from "../services/distribution";
 import {
   searchExternalArtists,
   searchExternalTracks,
 } from "../services/externalMusic";
-import { createMinterFromEnv } from "../token/minter-factory";
 import {
   closeSeasonSchema,
   confirmResultsSchema,
@@ -66,27 +64,6 @@ admin.post("/results", async (c) => {
   }
   await upsertResults(db, parsed.data.seasonId, parsed.data.entries);
   return c.json({ ok: true, count: parsed.data.entries.length });
-});
-
-// 記念トークンの配布（結果確定後・冪等）
-admin.post("/seasons/:id/distribute", async (c) => {
-  const db = getDb(c.env.DB);
-  const season = await findSeasonById(db, c.req.param("id"));
-  if (!season) {
-    return c.json(errorBody("NOT_FOUND", "シーズンが見つかりません"), 404);
-  }
-  if (season.predictionCloseAt === null) {
-    return c.json(errorBody("CONFLICT", "締切前は配布できません"), 409);
-  }
-  const minter = await createMinterFromEnv(c.env);
-  if (!minter) {
-    return c.json(
-      errorBody("NOT_CONFIGURED", "トークン配布が未設定です（RPC/mint/鍵）"),
-      501,
-    );
-  }
-  const summary = await distributeSeasonTokens(db, season, minter);
-  return c.json(summary);
 });
 
 // シーズン作成

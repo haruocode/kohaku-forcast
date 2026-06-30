@@ -1,50 +1,92 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet, ApiError } from "../../lib/api";
 import type { RankingRow, Season } from "../../lib/types";
 
+type Scope = "season" | "overall";
+
 export function RankingsPanel() {
+  const [scope, setScope] = useState<Scope>("season");
+
   const { data: season } = useQuery<Season>({
     queryKey: ["season", "current"],
     queryFn: () => apiGet<Season>("/seasons/current"),
   });
 
-  const { data, error, isLoading } = useQuery<RankingRow[]>({
-    queryKey: ["rankings", season?.id],
+  const seasonQuery = useQuery<RankingRow[]>({
+    queryKey: ["rankings", "season", season?.id],
     queryFn: () => apiGet<RankingRow[]>(`/rankings/${season!.id}`),
-    enabled: !!season,
+    enabled: scope === "season" && !!season,
   });
+
+  const overallQuery = useQuery<RankingRow[]>({
+    queryKey: ["rankings", "overall"],
+    queryFn: () => apiGet<RankingRow[]>("/rankings/overall"),
+    enabled: scope === "overall",
+  });
+
+  const active = scope === "season" ? seasonQuery : overallQuery;
+
+  const body = () => {
+    if (scope === "season" && !season) {
+      return <p className="muted">シーズンがありません。</p>;
+    }
+    if (active.isLoading) {
+      return <p className="muted">集計中…</p>;
+    }
+    if (
+      scope === "season" &&
+      active.error instanceof ApiError &&
+      active.error.code === "CONFLICT"
+    ) {
+      return <p className="muted">結果確定後に表示されます（締切前）。</p>;
+    }
+    const rows = active.data ?? [];
+    if (rows.length === 0) {
+      return <p className="muted">まだランキングはありません。</p>;
+    }
+    return (
+      <table className="ranking">
+        <thead>
+          <tr>
+            <th>順位</th>
+            <th>ユーザー</th>
+            <th>スコア</th>
+            <th>的中</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.userId}>
+              <td>{r.rank}</td>
+              <td>{r.displayName}</td>
+              <td>{r.score}</td>
+              <td>{r.hitCount}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  };
 
   return (
     <section className="panel">
       <h2>ランキング</h2>
-      {!season ? (
-        <p className="muted">シーズンがありません。</p>
-      ) : isLoading ? (
-        <p className="muted">集計中…</p>
-      ) : error instanceof ApiError && error.code === "CONFLICT" ? (
-        <p className="muted">結果確定後に表示されます（締切前）。</p>
-      ) : (
-        <table className="ranking">
-          <thead>
-            <tr>
-              <th>順位</th>
-              <th>ユーザー</th>
-              <th>スコア</th>
-              <th>的中</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(data ?? []).map((r) => (
-              <tr key={r.userId}>
-                <td>{r.rank}</td>
-                <td>{r.displayName}</td>
-                <td>{r.score}</td>
-                <td>{r.hitCount}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <nav className="subtabs">
+        <button
+          className={scope === "season" ? "active" : ""}
+          onClick={() => setScope("season")}
+        >
+          今シーズン
+        </button>
+        <button
+          className={scope === "overall" ? "active" : ""}
+          onClick={() => setScope("overall")}
+        >
+          通算
+        </button>
+      </nav>
+      {body()}
     </section>
   );
 }

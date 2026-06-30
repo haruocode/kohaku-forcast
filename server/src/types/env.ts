@@ -15,10 +15,6 @@ export type Bindings = {
   // 外部音楽DB検索（管理者の登録補助）。未設定なら Spotify はスキップし MusicBrainz のみ使う。
   SPOTIFY_CLIENT_ID?: string;
   SPOTIFY_CLIENT_SECRET?: string;
-  // 記念トークン配布用（未設定なら配布機能は無効）
-  SOLANA_RPC_URL?: string;
-  TOKEN_MINT_ADDRESS?: string;
-  MINT_AUTHORITY_SECRET?: string; // base58のsecret key
 };
 
 // 認証済みリクエストで参照するコンテキスト変数

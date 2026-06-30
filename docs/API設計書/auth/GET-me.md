@@ -34,7 +34,7 @@
 | avatarUrl   | string \| null | アバターURL |
 | isAdmin     | boolean        | 管理者か    |
 
-> `solana_address` 等の内部項目は返さない。
+> タイムスタンプ等の内部項目は返さない。
 
 ## エラー
 

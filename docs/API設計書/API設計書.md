@@ -33,8 +33,7 @@
 | 403  | `FORBIDDEN`        | 権限不足（他人のリソース・管理者専用）                   |
 | 403  | `SEASON_CLOSED`    | 締切後の投稿・編集・取消                                 |
 | 404  | `NOT_FOUND`        | リソースが存在しない                                     |
-| 409  | `CONFLICT`         | 重複（二重予想）/ 前提未充足（締切前のランキング・配布） |
-| 501  | `NOT_CONFIGURED`   | 機能が未設定（記念トークンの鍵/RPC 未設定）              |
+| 409  | `CONFLICT`         | 重複（二重予想）/ 前提未充足（締切前のランキング）       |
 
 ### 1.2 認可レベル
 
@@ -66,13 +65,10 @@
 | GET      | `/api/predictions?seasonId=`        | 公開       | 予想一覧                           |
 | PUT      | `/api/predictions/:id`              | 要ログイン | 予想の編集（受付中・本人のみ）     |
 | DELETE   | `/api/predictions/:id`              | 要ログイン | 予想の取消（受付中・本人のみ）     |
+| GET      | `/api/rankings/overall`             | 公開       | 通算ランキング（締切済み全シーズン合算） |
 | GET      | `/api/rankings/:seasonId`           | 公開       | シーズンのランキング（締切後）     |
-| POST     | `/api/wallet/challenge`             | 要ログイン | ウォレット連携チャレンジ発行       |
-| POST     | `/api/wallet/link`                  | 要ログイン | 署名検証してウォレット連携         |
-| GET      | `/api/wallet/awards`                | 要ログイン | 自分の記念トークン一覧             |
 | POST     | `/api/admin/seasons`                | 要管理者   | シーズン作成                       |
 | POST     | `/api/admin/seasons/:id/close`      | 要管理者   | 締切操作（公式発表日時の設定）     |
-| POST     | `/api/admin/seasons/:id/distribute` | 要管理者   | 記念トークン配布                   |
 | POST     | `/api/admin/results`                | 要管理者   | 結果確定（冪等）                   |
 | POST     | `/api/admin/artists`                | 要管理者   | アーティスト作成（別名同時可）     |
 | POST     | `/api/admin/songs`                  | 要管理者   | 曲作成                             |
@@ -206,30 +202,12 @@
 並び順: ①合計スコア降順 → ②的中件数降順 → ③最初の予想投稿が早い順。
 スコア・的中件数が同じなら同順位（競技順位法）。`score` は内部の小数を四捨五入した整数。
 
-### 3.6 ウォレット連携
+#### `GET /api/rankings/overall` （公開）
 
-なりすまし防止のため署名チャレンジで所有を確認する。
+通算ランキング。結果確定済み（締切済み）の全シーズンのスコアを合算する。レスポンス形は
+シーズン版と同じ。締切済みシーズンが無ければ `[]`。`score`（通算ポイント）は**負もあり得る**。
 
-1. `POST /api/wallet/challenge` → `{ "message": "...", "challenge": "..." }`（要ログイン）。
-   `challenge` は `SESSION_SECRET` 署名・ユーザーID紐付け・期限付き。
-2. クライアントがウォレットで `message` に署名。
-3. `POST /api/wallet/link`（要ログイン）:
-
-```jsonc
-// req
-{ "address": "<base58>", "signature": "<base58>", "challenge": "<手順1の値>" }
-// 200
-{ "address": "<base58>", "walletVerifiedAt": "2026-..." }
-```
-
-エラー: `400 VALIDATION_ERROR`（アドレス不正・チャレンジ無効/期限切れ） /
-`401 UNAUTHORIZED`（署名検証失敗）。
-
-#### `GET /api/wallet/awards` （要ログイン）
-
-自分の記念トークン配布記録の一覧（`seasonYear` / `amount` / `status` / `txSignature`）。
-
-### 3.7 管理（要管理者）
+### 3.6 管理（要管理者）
 
 #### `POST /api/admin/seasons`
 
@@ -263,17 +241,6 @@
 ```
 
 `(season_id, artist_id)` で upsert するため、再送・内容変更しても行は重複せず更新される。
-
-#### `POST /api/admin/seasons/:id/distribute`（記念トークン配布）
-
-結果確定後・締切済みのシーズンに対し、合計スコアに比例した枚数を配布する。冪等。
-
-```jsonc
-// 200（サマリ）… { total, sent, skipped, ... }
-```
-
-エラー: `404`（シーズン無し） / `409 CONFLICT`（締切前） /
-`501 NOT_CONFIGURED`（RPC/mint/鍵 未設定）。ウォレット未連携の当選者は skipped。
 
 #### `POST /api/admin/artists`
 
@@ -339,7 +306,9 @@
 
 ユーザー単位に集計し、3.5 の順序で並べる。スコアが付いた（正の点の）予想を `hitCount` に数える。
 
-### 4.4 記念トークン配布量（`domain/distribution.ts`）
+### 4.4 通算ポイント（`domain/ranking.ts` `combineRankings`）
 
-配布量 = そのシーズンの合計スコア（整数）。スコア0以下のユーザーは対象外。
-`token_awards` の `(user_id, season_id)` 一意制約で二重配布を防ぎ、`pending → sent/failed` で記録する。
+通算ポイント＝結果確定済み（締切済み）全シーズンのスコア合計。専用テーブルは持たず都度算出する。
+各シーズンの `totalScore` / `hitCount` を合算し、`earliestAt` は全シーズンの最初の投稿時刻を採る。
+並び順はシーズン版と同じ。**通算スコアはマイナスも許容**（floorしない）。
+ポイントは譲渡・換金・購入いずれも不可で、財産的価値を持たせない。

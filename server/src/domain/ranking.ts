@@ -34,6 +34,38 @@ export type RankEntry = {
 
 type Acc = { userId: string; totalScore: number; hitCount: number; earliestAt: string };
 
+/**
+ * ユーザー集計を並べて順位を振る（DB非依存）。
+ * 並び順: 合計スコア降順 → 的中件数降順 → 最初の予想投稿が早い順。
+ * 競技順位法: スコアと的中件数が同じなら同順位（時刻は表示順のみ）。
+ */
+function rankAccumulators(accs: readonly Acc[]): RankEntry[] {
+  const sorted = [...accs].sort((a, b) => {
+    if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
+    if (b.hitCount !== a.hitCount) return b.hitCount - a.hitCount;
+    return a.earliestAt < b.earliestAt ? -1 : a.earliestAt > b.earliestAt ? 1 : 0;
+  });
+
+  const entries: RankEntry[] = [];
+  sorted.forEach((acc, i) => {
+    const prev = sorted[i - 1];
+    const tied =
+      prev !== undefined &&
+      prev.totalScore === acc.totalScore &&
+      prev.hitCount === acc.hitCount;
+    const rank = tied ? entries[i - 1]!.rank : i + 1;
+    entries.push({
+      rank,
+      userId: acc.userId,
+      totalScore: acc.totalScore,
+      hitCount: acc.hitCount,
+      earliestAt: acc.earliestAt,
+    });
+  });
+
+  return entries;
+}
+
 export function computeRanking(
   predictions: readonly RankablePrediction[],
   results: ResultsByArtist,
@@ -62,29 +94,32 @@ export function computeRanking(
     byUser.set(p.userId, acc);
   }
 
-  const sorted = [...byUser.values()].sort((a, b) => {
-    if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
-    if (b.hitCount !== a.hitCount) return b.hitCount - a.hitCount;
-    return a.earliestAt < b.earliestAt ? -1 : a.earliestAt > b.earliestAt ? 1 : 0;
-  });
+  return rankAccumulators([...byUser.values()]);
+}
 
-  // 競技順位法: スコアと的中件数が同じなら同順位（時刻は表示順のみ）
-  const entries: RankEntry[] = [];
-  sorted.forEach((acc, i) => {
-    const prev = sorted[i - 1];
-    const tied =
-      prev !== undefined &&
-      prev.totalScore === acc.totalScore &&
-      prev.hitCount === acc.hitCount;
-    const rank = tied ? entries[i - 1]!.rank : i + 1;
-    entries.push({
-      rank,
-      userId: acc.userId,
-      totalScore: acc.totalScore,
-      hitCount: acc.hitCount,
-      earliestAt: acc.earliestAt,
-    });
-  });
+/**
+ * 複数シーズンのランキングを合算して通算ランキングを作る（DB非依存）。
+ * - 通算スコア = 各シーズンの totalScore の合計（マイナスも許容）
+ * - 的中件数 = 各シーズンの hitCount の合計
+ * - earliestAt = 全シーズンを通じた最初の予想投稿時刻
+ * 並び順・同順位ルールはシーズン版と同じ。
+ */
+export function combineRankings(
+  seasonRankings: readonly (readonly RankEntry[])[],
+): RankEntry[] {
+  const byUser = new Map<string, Acc>();
 
-  return entries;
+  for (const ranking of seasonRankings) {
+    for (const e of ranking) {
+      const acc =
+        byUser.get(e.userId) ??
+        { userId: e.userId, totalScore: 0, hitCount: 0, earliestAt: e.earliestAt };
+      acc.totalScore += e.totalScore;
+      acc.hitCount += e.hitCount;
+      if (e.earliestAt < acc.earliestAt) acc.earliestAt = e.earliestAt;
+      byUser.set(e.userId, acc);
+    }
+  }
+
+  return rankAccumulators([...byUser.values()]);
 }
