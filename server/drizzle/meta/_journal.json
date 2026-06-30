@@ -29,6 +29,13 @@
       "when": 1782827160308,
       "tag": "0003_special_kitty_pryde",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1782836202190,
+      "tag": "0004_green_nightcrawler",
+      "breakpoints": true
     }
   ]
 }

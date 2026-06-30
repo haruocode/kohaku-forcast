@@ -19,8 +19,31 @@ export const users = sqliteTable("users", {
   googleSub: text("google_sub").notNull().unique(),
   avatarUrl: text("avatar_url"),
   isAdmin: integer("is_admin", { mode: "boolean" }).notNull().default(false),
+  // 所持ポイント残高（ベット通貨）。増減は必ず point_ledger に記録する。
+  points: integer("points").notNull().default(0),
+  // 日次ログインボーナスを最後に受け取った日（JST基準の YYYY-MM-DD）。二重付与防止。
+  lastDailyBonusDate: text("last_daily_bonus_date"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
+});
+
+// ポイントの入出金台帳。残高(users.points)の全変動を1行ずつ記録する監査ログ。
+// reason: signup（初回付与）/ daily（日次ボーナス）/ bet（予想で消費）
+//        / payout（的中配当）/ refund（取消・編集での返金）
+export const pointLedger = sqliteTable("point_ledger", {
+  id: id(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  // 増減量（付与・配当・返金は正、ベット消費は負）
+  delta: integer("delta").notNull(),
+  reason: text("reason").notNull(),
+  // この変動の適用後残高（履歴表示用のスナップショット）
+  balanceAfter: integer("balance_after").notNull(),
+  // 関連する予想id（bet / payout / refund のとき）。それ以外は NULL
+  refId: text("ref_id"),
+  note: text("note"),
+  createdAt: createdAt(),
 });
 
 export const artists = sqliteTable(
@@ -104,8 +127,14 @@ export const predictions = sqliteTable(
       .references(() => artists.id, { onDelete: "cascade" }),
     // nullable: 「出場予想のみ（曲は予想しない）」を許可する
     songId: text("song_id").references(() => songs.id, { onDelete: "set null" }),
-    // 1〜5（範囲は API の Zod で検証する）
-    confidence: integer("confidence").notNull(),
+    // 旧: 自信度1〜5。ベット制移行で未使用（互換のため nullable 列として残置）。
+    confidence: integer("confidence"),
+    // 賭け額（ポイント）。作成時に残高から消費する。範囲は API の Zod で検証する。
+    stake: integer("stake").notNull().default(0),
+    // 精算済みフラグ。結果確定後の配当付与を一度だけにする冪等性キー。
+    settled: integer("settled", { mode: "boolean" }).notNull().default(false),
+    // 精算で得た配当（的中なら正、外れは0）。未精算は NULL。
+    payout: integer("payout"),
     comment: text("comment"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

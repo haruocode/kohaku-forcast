@@ -1,7 +1,8 @@
 import { eq, inArray } from "drizzle-orm";
 import type { Db } from "../db";
-import { users } from "../db/schema";
+import { users, pointLedger } from "../db/schema";
 import type { GoogleProfile } from "../auth/google";
+import { INITIAL_GRANT } from "../config/points";
 
 export type User = typeof users.$inferSelect;
 
@@ -63,15 +64,25 @@ export async function upsertUserByGoogleSub(
     return updated;
   }
 
-  const created = await db
-    .insert(users)
-    .values({
+  // 新規登録は初期ポイントを付与し、台帳に signup として残す（残高更新と記録を原子的に）。
+  const userId = crypto.randomUUID();
+  await db.batch([
+    db.insert(users).values({
+      id: userId,
       displayName: profile.name ?? profile.email,
       email: profile.email,
       googleSub: profile.sub,
       avatarUrl: profile.picture,
-    })
-    .returning()
-    .get();
-  return created;
+      points: INITIAL_GRANT,
+    }),
+    db.insert(pointLedger).values({
+      userId,
+      delta: INITIAL_GRANT,
+      reason: "signup",
+      balanceAfter: INITIAL_GRANT,
+      note: "初回登録ボーナス",
+    }),
+  ]);
+  const created = await findUserById(db, userId);
+  return created!;
 }

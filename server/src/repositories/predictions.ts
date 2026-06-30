@@ -1,6 +1,7 @@
 import { and, eq, desc } from "drizzle-orm";
 import type { Db } from "../db";
-import { predictions, artists, songs, users } from "../db/schema";
+import { predictions, artists, songs, users, pointLedger } from "../db/schema";
+import { InsufficientPointsError } from "./points";
 
 export type Prediction = typeof predictions.$inferSelect;
 
@@ -16,14 +17,14 @@ export type CreatePredictionValues = {
   seasonId: string;
   artistId: string;
   songId: string | null;
-  confidence: number;
+  stake: number;
   comment?: string;
 };
 
 /** 予想の更新に渡す、解決済みのローカル値（指定された項目のみ反映） */
 export type UpdatePredictionValues = {
   songId?: string | null;
-  confidence?: number;
+  stake?: number;
   comment?: string | null;
 };
 
@@ -54,23 +55,46 @@ export async function findDuplicate(
     .get();
 }
 
-export async function createPrediction(
+/**
+ * 予想を作成し、賭け額を残高から消費する（予想挿入・残高更新・台帳記録を batch で原子的に）。
+ * 残高不足なら InsufficientPointsError。
+ */
+export async function createPredictionWithStake(
   db: Db,
   userId: string,
   input: CreatePredictionValues,
-): Promise<Prediction> {
-  return db
-    .insert(predictions)
-    .values({
+  currentBalance: number,
+): Promise<{ prediction: Prediction; balanceAfter: number }> {
+  if (currentBalance < input.stake) throw new InsufficientPointsError();
+  const balanceAfter = currentBalance - input.stake;
+  const predId = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  await db.batch([
+    db.insert(predictions).values({
+      id: predId,
       userId,
       seasonId: input.seasonId,
       artistId: input.artistId,
       songId: input.songId,
-      confidence: input.confidence,
+      stake: input.stake,
       comment: input.comment ?? null,
-    })
-    .returning()
-    .get();
+    }),
+    db
+      .update(users)
+      .set({ points: balanceAfter, updatedAt: now })
+      .where(eq(users.id, userId)),
+    db.insert(pointLedger).values({
+      userId,
+      delta: -input.stake,
+      reason: "bet",
+      balanceAfter,
+      refId: predId,
+    }),
+  ]);
+
+  const prediction = await findPredictionById(db, predId);
+  return { prediction: prediction!, balanceAfter };
 }
 
 export async function updatePrediction(
@@ -82,7 +106,7 @@ export async function updatePrediction(
     updatedAt: new Date().toISOString(),
   };
   if (patch.songId !== undefined) values.songId = patch.songId;
-  if (patch.confidence !== undefined) values.confidence = patch.confidence;
+  if (patch.stake !== undefined) values.stake = patch.stake;
   if (patch.comment !== undefined) values.comment = patch.comment;
 
   return db
@@ -95,6 +119,19 @@ export async function updatePrediction(
 
 export async function deletePrediction(db: Db, id: string): Promise<void> {
   await db.delete(predictions).where(eq(predictions.id, id)).run();
+}
+
+/** 精算結果（配当・精算済みフラグ）を記録する */
+export async function markSettled(
+  db: Db,
+  id: string,
+  payout: number,
+): Promise<void> {
+  await db
+    .update(predictions)
+    .set({ settled: true, payout, updatedAt: new Date().toISOString() })
+    .where(eq(predictions.id, id))
+    .run();
 }
 
 export async function listPredictions(
@@ -121,6 +158,9 @@ export async function listPredictionsDetailed(
       artistId: predictions.artistId,
       songId: predictions.songId,
       confidence: predictions.confidence,
+      stake: predictions.stake,
+      settled: predictions.settled,
+      payout: predictions.payout,
       comment: predictions.comment,
       createdAt: predictions.createdAt,
       updatedAt: predictions.updatedAt,

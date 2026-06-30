@@ -1,102 +1,56 @@
 import { Hono } from "hono";
 import { getDb } from "../db";
-import type { Db } from "../db";
 import { requireAuth } from "../auth/session";
-import { displayScore } from "../domain/scoring";
 import {
-  computeRanking,
-  combineRankings,
-  type RankablePrediction,
-  type RankEntry,
-  type ResultsByArtist,
-} from "../domain/ranking";
-import { findSeasonById, listSeasons } from "../repositories/seasons";
-import type { Season } from "../repositories/seasons";
-import { listPredictions } from "../repositories/predictions";
-import { listResultsBySeason } from "../repositories/results";
-import { findUsersByIds } from "../repositories/users";
+  balanceLeaderboard,
+  seasonProfitLeaderboard,
+  type BalanceRow,
+} from "../repositories/leaderboard";
+import { findSeasonById } from "../repositories/seasons";
 import { errorBody } from "../lib/http";
 import type { Bindings, Variables } from "../types/env";
 
 const rankings = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
-/** 1シーズンの順位を算出する（採点・早押し・不正投票除外を含む） */
-async function rankSeason(db: Db, season: Season): Promise<RankEntry[]> {
-  const [predictionRows, resultRows] = await Promise.all([
-    listPredictions(db, season.id),
-    listResultsBySeason(db, season.id),
-  ]);
-
-  const results: ResultsByArtist = new Map(
-    resultRows.map((r) => [r.artistId, { appeared: r.appeared, actualSongId: r.songId }]),
-  );
-
-  const predictions: RankablePrediction[] = predictionRows.map((p) => ({
-    userId: p.userId,
-    artistId: p.artistId,
-    predictedSongId: p.songId,
-    createdAt: p.createdAt,
-    updatedAt: p.updatedAt,
-  }));
-
-  // 受付開始が未設定なら早押しボーナスは無効化（span<=0 → 倍率1.0）。
-  // 締切後のみ呼ぶ前提なので predictionCloseAt は非 null。
-  const window = {
-    openAt: season.predictionOpenAt ?? season.predictionCloseAt!,
-    closeAt: season.predictionCloseAt!,
-  };
-
-  return computeRanking(predictions, results, window);
+/** 競技順位法で順位を振る（同値は同順位）。value 降順前提の配列を受け取る。 */
+function withRanks<T extends { value: number }>(sorted: T[]): (T & { rank: number })[] {
+  const out: (T & { rank: number })[] = [];
+  sorted.forEach((row, i) => {
+    const prev = sorted[i - 1];
+    const rank = prev && prev.value === row.value ? out[i - 1]!.rank : i + 1;
+    out.push({ ...row, rank });
+  });
+  return out;
 }
 
-/** RankEntry[] に表示名を添えてレスポンス形へ整形する */
-async function withDisplayNames(db: Db, ranked: RankEntry[]) {
-  const users = await findUsersByIds(db, ranked.map((e) => e.userId));
-  const nameById = new Map(users.map((u) => [u.id, u.displayName]));
-  return ranked.map((e) => ({
-    rank: e.rank,
-    userId: e.userId,
-    displayName: nameById.get(e.userId) ?? "(unknown)",
-    score: displayScore(e.totalScore),
-    hitCount: e.hitCount,
-  }));
-}
-
-/** 締切済み全シーズンを合算した通算ランキングを返す */
-async function computeOverall(db: Db): Promise<RankEntry[]> {
-  const closedSeasons = (await listSeasons(db)).filter(
-    (s) => s.predictionCloseAt !== null,
-  );
-  const seasonRankings = await Promise.all(
-    closedSeasons.map((s) => rankSeason(db, s)),
-  );
-  return combineRankings(seasonRankings);
-}
-
-// 通算ランキング（結果確定済み＝締切済み全シーズンのスコア合算）。
-// /:seasonId より先に登録する（"overall" がパスパラメータに食われないように）。
+// 通算ランキング（所持ポイント残高の多い順）。アマギフ判定の基準。
 rankings.get("/overall", async (c) => {
   const db = getDb(c.env.DB);
-  const overall = await computeOverall(db);
-  return c.json(await withDisplayNames(db, overall));
+  const rows = await balanceLeaderboard(db);
+  const ranked = withRanks(rows.map((r) => ({ ...r, value: r.points })));
+  return c.json(
+    ranked.map((r) => ({
+      rank: r.rank,
+      userId: r.userId,
+      displayName: r.displayName,
+      score: r.points,
+    })),
+  );
 });
 
-// ログインユーザー自身の通算ポイント・順位（ヘッダー表示用）。
-// 未参加（締切済みシーズンでの予想なし）でも 0 ポイントとして返す。
+// ログインユーザー自身の残高と順位（ヘッダー表示用）。
 rankings.get("/me", requireAuth, async (c) => {
   const db = getDb(c.env.DB);
   const userId = c.get("userId");
-  const overall = await computeOverall(db);
-  const mine = overall.find((e) => e.userId === userId);
-  return c.json({
-    score: mine ? displayScore(mine.totalScore) : 0,
-    rank: mine?.rank ?? null,
-    hitCount: mine?.hitCount ?? 0,
-    totalUsers: overall.length,
-  });
+  const rows: BalanceRow[] = await balanceLeaderboard(db);
+  const mine = rows.find((r) => r.userId === userId);
+  const score = mine?.points ?? 0;
+  // 自分より残高が多い人数 + 1 が順位（同値は同順位）。
+  const rank = mine ? rows.filter((r) => r.points > score).length + 1 : null;
+  return c.json({ score, rank, totalUsers: rows.length });
 });
 
-// シーズンのランキング（結果確定後）
+// シーズンのランキング（精算済みの純損益順）。
 rankings.get("/:seasonId", async (c) => {
   const db = getDb(c.env.DB);
   const season = await findSeasonById(db, c.req.param("seasonId"));
@@ -110,8 +64,19 @@ rankings.get("/:seasonId", async (c) => {
     );
   }
 
-  const ranked = await rankSeason(db, season);
-  return c.json(await withDisplayNames(db, ranked));
+  const rows = await seasonProfitLeaderboard(db, season.id);
+  const ranked = withRanks(rows.map((r) => ({ ...r, value: r.profit })));
+  return c.json(
+    ranked.map((r) => ({
+      rank: r.rank,
+      userId: r.userId,
+      displayName: r.displayName,
+      score: r.profit,
+      staked: r.staked,
+      won: r.won,
+      hitCount: r.hitCount,
+    })),
+  );
 });
 
 export default rankings;

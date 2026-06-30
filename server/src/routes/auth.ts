@@ -16,6 +16,8 @@ import {
   findUserById,
   updateDisplayName,
 } from "../repositories/users";
+import { claimDailyBonus } from "../repositories/points";
+import { DAILY_BONUS, jstDate } from "../config/points";
 import { errorBody } from "../lib/http";
 import type { Bindings, Variables } from "../types/env";
 
@@ -92,6 +94,7 @@ type MeUser = {
   email: string;
   avatarUrl: string | null;
   isAdmin: boolean;
+  points: number;
 };
 
 const meResponse = (u: MeUser) => ({
@@ -100,16 +103,19 @@ const meResponse = (u: MeUser) => ({
   email: u.email,
   avatarUrl: u.avatarUrl,
   isAdmin: u.isAdmin,
+  points: u.points,
 });
 
-// 現在のログインユーザー
+// 現在のログインユーザー。アクセス時に日次ログインボーナスを（1日1回）付与する。
 auth.get("/me", requireAuth, async (c) => {
   const db = getDb(c.env.DB);
   const user = await findUserById(db, c.get("userId"));
   if (!user) {
     return c.json(errorBody("NOT_FOUND", "ユーザーが見つかりません"), 404);
   }
-  return c.json(meResponse(user));
+  // 日次ボーナス（未受領なら付与し、付与後残高を反映）
+  const newBalance = await claimDailyBonus(db, user, jstDate(), DAILY_BONUS);
+  return c.json(meResponse({ ...user, points: newBalance ?? user.points }));
 });
 
 // 表示名の変更

@@ -7,13 +7,18 @@ import { findSeasonById } from "../repositories/seasons";
 import { resolveExternalArtist } from "../repositories/artists";
 import { resolveExternalSong } from "../repositories/songs";
 import {
-  createPrediction,
+  createPredictionWithStake,
   updatePrediction,
   deletePrediction,
   findPredictionById,
   findDuplicate,
   listPredictionsDetailed,
 } from "../repositories/predictions";
+import {
+  applyPointChange,
+  InsufficientPointsError,
+} from "../repositories/points";
+import { findUserById } from "../repositories/users";
 import {
   createPredictionSchema,
   updatePredictionSchema,
@@ -69,14 +74,31 @@ predictions.post("/", requireAuth, async (c) => {
     ? await resolveExternalSong(db, artist.id, input.song)
     : null;
 
-  const created = await createPrediction(db, userId, {
-    seasonId: input.seasonId,
-    artistId: artist.id,
-    songId: song?.id ?? null,
-    confidence: input.confidence,
-    comment: input.comment,
-  });
-  return c.json(created, 201);
+  const user = await findUserById(db, userId);
+  if (!user) {
+    return c.json(errorBody("NOT_FOUND", "ユーザーが見つかりません"), 404);
+  }
+
+  try {
+    const { prediction, balanceAfter } = await createPredictionWithStake(
+      db,
+      userId,
+      {
+        seasonId: input.seasonId,
+        artistId: artist.id,
+        songId: song?.id ?? null,
+        stake: input.stake,
+        comment: input.comment,
+      },
+      user.points,
+    );
+    return c.json({ ...prediction, balanceAfter }, 201);
+  } catch (e) {
+    if (e instanceof InsufficientPointsError) {
+      return c.json(errorBody("INSUFFICIENT_POINTS", e.message), 400);
+    }
+    throw e;
+  }
 });
 
 // 予想の一覧（公開）。?seasonId= で絞り込み可
@@ -117,12 +139,32 @@ predictions.put("/:id", requireAuth, async (c) => {
       : null;
   }
 
+  // 賭け額を変更する場合は差分を残高に反映する（増額は消費・減額は返金）。
+  let balanceAfter: number | undefined;
+  if (patch.stake !== undefined && patch.stake !== existing.stake) {
+    const delta = patch.stake - existing.stake; // 正=増額
+    try {
+      balanceAfter = await applyPointChange(
+        db,
+        existing.userId,
+        -delta,
+        delta > 0 ? "bet" : "refund",
+        { refId: existing.id, note: "賭け額変更" },
+      );
+    } catch (e) {
+      if (e instanceof InsufficientPointsError) {
+        return c.json(errorBody("INSUFFICIENT_POINTS", e.message), 400);
+      }
+      throw e;
+    }
+  }
+
   const updated = await updatePrediction(db, existing.id, {
     songId,
-    confidence: patch.confidence,
+    stake: patch.stake,
     comment: patch.comment,
   });
-  return c.json(updated);
+  return c.json({ ...updated, balanceAfter });
 });
 
 // 予想の取消（受付中・本人のみ）
@@ -142,7 +184,15 @@ predictions.delete("/:id", requireAuth, async (c) => {
   }
 
   await deletePrediction(db, existing.id);
-  return c.json({ ok: true });
+  // 賭け額を返金する（取消）。
+  const balanceAfter = await applyPointChange(
+    db,
+    existing.userId,
+    existing.stake,
+    "refund",
+    { refId: existing.id, note: "予想取消" },
+  );
+  return c.json({ ok: true, balanceAfter });
 });
 
 export default predictions;

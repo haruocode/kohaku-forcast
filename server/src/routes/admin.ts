@@ -6,6 +6,8 @@ import { findSeasonById, closeSeason, createSeason } from "../repositories/seaso
 import { createArtist, findArtistById } from "../repositories/artists";
 import { createSong } from "../repositories/songs";
 import { upsertResults } from "../repositories/results";
+import { settleSeason } from "../services/settlement";
+import { listAllLedger } from "../repositories/points";
 import {
   searchExternalArtists,
   searchExternalTracks,
@@ -64,6 +66,31 @@ admin.post("/results", async (c) => {
   }
   await upsertResults(db, parsed.data.seasonId, parsed.data.entries);
   return c.json({ ok: true, count: parsed.data.entries.length });
+});
+
+// 精算: 結果確定後、未精算の予想に配当を付与する（settled で冪等）。締切済みのみ。
+admin.post("/seasons/:id/settle", async (c) => {
+  const db = getDb(c.env.DB);
+  const season = await findSeasonById(db, c.req.param("id"));
+  if (!season) {
+    return c.json(errorBody("NOT_FOUND", "シーズンが見つかりません"), 404);
+  }
+  if (season.predictionCloseAt === null) {
+    return c.json(
+      errorBody("CONFLICT", "締切前のシーズンは精算できません"),
+      409,
+    );
+  }
+  const summary = await settleSeason(db, season);
+  return c.json({ ok: true, ...summary });
+});
+
+// 全ユーザーのポイント履歴（いつ・誰に・何ポイント・理由）。新しい順。
+admin.get("/points/ledger", async (c) => {
+  const db = getDb(c.env.DB);
+  const limit = Number(c.req.query("limit") ?? 200);
+  const rows = await listAllLedger(db, Number.isFinite(limit) ? limit : 200);
+  return c.json(rows);
 });
 
 // シーズン作成

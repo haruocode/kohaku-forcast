@@ -1,6 +1,12 @@
 import { z } from "zod";
+import { MIN_BET } from "../config/points";
 
 const externalSource = z.enum(["spotify", "musicbrainz"]);
+
+const stakeSchema = z
+  .number()
+  .int("賭け額は整数で指定してください")
+  .min(MIN_BET, `賭け額は${MIN_BET}ポイント以上にしてください`);
 
 // ユーザーが外部音楽DB（Spotify / MusicBrainz）から直接選んだアーティスト。
 // サーバー側で (source, external_id) をキーにローカルへ遅延アップサートする。
@@ -25,7 +31,7 @@ export const createPredictionSchema = z.object({
   seasonId: z.string().min(1),
   artist: externalArtistSchema,
   song: externalTrackSchema.nullable().optional(),
-  confidence: z.number().int().min(1).max(5),
+  stake: stakeSchema,
   comment: z.string().max(500).optional(),
 });
 
@@ -34,7 +40,7 @@ export const createPredictionSchema = z.object({
 export const updatePredictionSchema = z
   .object({
     song: externalTrackSchema.nullable().optional(),
-    confidence: z.number().int().min(1).max(5).optional(),
+    stake: stakeSchema.optional(),
     comment: z.string().max(500).nullable().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, {
