@@ -30,7 +30,7 @@ CREATE TABLE `__new_predictions` (
 	FOREIGN KEY (`song_id`) REFERENCES `songs`(`id`) ON UPDATE no action ON DELETE set null
 );
 --> statement-breakpoint
-INSERT INTO `__new_predictions`("id", "user_id", "season_id", "artist_id", "song_id", "confidence", "stake", "settled", "payout", "comment", "created_at", "updated_at") SELECT "id", "user_id", "season_id", "artist_id", "song_id", "confidence", "stake", "settled", "payout", "comment", "created_at", "updated_at" FROM `predictions`;--> statement-breakpoint
+INSERT INTO `__new_predictions`("id", "user_id", "season_id", "artist_id", "song_id", "confidence", "comment", "created_at", "updated_at") SELECT "id", "user_id", "season_id", "artist_id", "song_id", "confidence", "comment", "created_at", "updated_at" FROM `predictions`;--> statement-breakpoint
 DROP TABLE `predictions`;--> statement-breakpoint
 ALTER TABLE `__new_predictions` RENAME TO `predictions`;--> statement-breakpoint
 PRAGMA foreign_keys=ON;--> statement-breakpoint
