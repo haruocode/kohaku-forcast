@@ -1,0 +1,781 @@
+openapi: 3.1.0
+info:
+  title: 紅白予想 API (kohaku-yoso)
+  version: 1.0.0
+  description: >
+    NHK紅白歌合戦の出場者・歌唱曲・結果を予想するWebアプリのREST API。
+    実装は Cloudflare Workers + Hono。詳細は docs/API設計書.md を参照。
+    認証はセッションCookie(JWT/HS256)。ブラウザからは credentials:include で送る。
+servers:
+  - url: /
+    description: 同一オリジン（本番は SPA と同居）
+
+tags:
+  - name: auth
+    description: 認証・ユーザー
+  - name: seasons
+    description: シーズン（年度）
+  - name: artists
+    description: アーティスト
+  - name: songs
+    description: 曲
+  - name: predictions
+    description: 予想
+  - name: rankings
+    description: ランキング
+  - name: wallet
+    description: ウォレット連携・記念トークン
+  - name: admin
+    description: 管理（要管理者）
+  - name: system
+    description: システム
+
+paths:
+  /health:
+    get:
+      tags: [system]
+      summary: ヘルスチェック
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+
+  /api/auth/google/login:
+    get:
+      tags: [auth]
+      summary: Google認可画面へリダイレクト
+      security: []
+      responses:
+        "302": { description: Google OAuth へリダイレクト }
+
+  /api/auth/google/callback:
+    get:
+      tags: [auth]
+      summary: OAuthコールバック（セッション発行）
+      security: []
+      parameters:
+        - { name: code, in: query, schema: { type: string } }
+        - { name: state, in: query, schema: { type: string } }
+      responses:
+        "302": { description: ログイン後の遷移先へリダイレクト }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/auth/logout:
+    post:
+      tags: [auth]
+      summary: ログアウト
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean } } }
+
+  /api/auth/me:
+    get:
+      tags: [auth]
+      summary: 現在のログインユーザー
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [auth]
+      summary: 表示名の変更
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [displayName]
+              properties:
+                displayName: { type: string, minLength: 1, maxLength: 50 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/seasons:
+    get:
+      tags: [seasons]
+      summary: シーズン一覧
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Season" }
+
+  /api/seasons/current:
+    get:
+      tags: [seasons]
+      summary: 現在のシーズン
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Season" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/artists:
+    get:
+      tags: [artists]
+      summary: アーティスト一覧
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Artist" }
+
+  /api/artists/search:
+    get:
+      tags: [artists]
+      summary: アーティスト検索（ローカルDB）
+      security: []
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, default: 20, maximum: 50 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Artist" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+
+  /api/artists/external:
+    get:
+      tags: [artists]
+      summary: アーティスト検索（外部音楽DB）
+      description: Spotifyを主に、未設定/空ならMusicBrainzへフォールバック。
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ExternalArtist" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/artists/{id}/songs:
+    get:
+      tags: [artists]
+      summary: アーティストの曲一覧
+      security: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Song" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/songs/search:
+    get:
+      tags: [songs]
+      summary: 曲検索（ローカルDB）
+      security: []
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, default: 20, maximum: 50 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SongWithArtist" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+
+  /api/songs/external:
+    get:
+      tags: [songs]
+      summary: 曲検索（外部音楽DB）
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ExternalTrack" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/predictions:
+    get:
+      tags: [predictions]
+      summary: 予想一覧
+      security: []
+      parameters:
+        - { name: seasonId, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PredictionListItem" }
+    post:
+      tags: [predictions]
+      summary: 予想の投稿
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreatePrediction" }
+      responses:
+        "201":
+          description: 作成
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Prediction" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/SeasonClosed" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/predictions/{id}:
+    put:
+      tags: [predictions]
+      summary: 予想の編集（受付中・本人のみ）
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdatePrediction" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Prediction" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [predictions]
+      summary: 予想の取消（受付中・本人のみ）
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/rankings/{seasonId}:
+    get:
+      tags: [rankings]
+      summary: シーズンのランキング（締切後）
+      security: []
+      parameters:
+        - { name: seasonId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/RankingRow" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/wallet/challenge:
+    post:
+      tags: [wallet]
+      summary: ウォレット連携チャレンジ発行
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WalletChallenge" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/wallet/link:
+    post:
+      tags: [wallet]
+      summary: 署名検証してウォレット連携
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [address, signature, challenge]
+              properties:
+                address: { type: string, description: base58 Solanaアドレス }
+                signature: { type: string, description: base58 ed25519署名 }
+                challenge: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  address: { type: string, nullable: true }
+                  walletVerifiedAt: { type: string, nullable: true }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/wallet/awards:
+    get:
+      tags: [wallet]
+      summary: 自分の記念トークン一覧
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TokenAward" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/admin/seasons:
+    post:
+      tags: [admin]
+      summary: シーズン作成
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [year]
+              properties:
+                year: { type: integer, minimum: 1950, maximum: 2100 }
+                title: { type: string }
+                predictionOpenAt: { type: string, format: date-time }
+      responses:
+        "201":
+          description: 作成
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Season" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/admin/seasons/{id}/close:
+    post:
+      tags: [admin]
+      summary: 締切操作（公式発表日時の設定）
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [announcedAt]
+              properties:
+                announcedAt:
+                  type: string
+                  format: date-time
+                  description: 公式発表の日時。過去日時も可。
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Season" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/admin/seasons/{id}/distribute:
+    post:
+      tags: [admin]
+      summary: 記念トークン配布（締切後・冪等）
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: 配布サマリ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total: { type: integer }
+                  sent: { type: integer }
+                  skipped: { type: integer }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "501": { $ref: "#/components/responses/NotConfigured" }
+
+  /api/admin/results:
+    post:
+      tags: [admin]
+      summary: 結果確定（冪等）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [seasonId, entries]
+              properties:
+                seasonId: { type: string }
+                entries:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [artistId, appeared]
+                    properties:
+                      artistId: { type: string }
+                      appeared: { type: boolean }
+                      songId: { type: string, nullable: true }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  count: { type: integer }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/admin/artists:
+    post:
+      tags: [admin]
+      summary: アーティスト作成（別名同時可）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                nameKana: { type: string }
+                genderGroup: { type: string }
+                officialUrl: { type: string, format: uri }
+                aliases:
+                  type: array
+                  items: { type: string }
+      responses:
+        "201":
+          description: 作成
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Artist" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/admin/songs:
+    post:
+      tags: [admin]
+      summary: 曲作成
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [artistId, title]
+              properties:
+                artistId: { type: string }
+                title: { type: string }
+                titleKana: { type: string }
+                releaseYear: { type: integer, minimum: 1900, maximum: 2100 }
+      responses:
+        "201":
+          description: 作成
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Song" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/admin/external/artists:
+    get:
+      tags: [admin]
+      summary: 外部アーティスト検索（登録補助）
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ExternalArtist" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/admin/external/tracks:
+    get:
+      tags: [admin]
+      summary: 外部曲検索（登録補助）
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ExternalTrack" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session
+  security:
+    - sessionCookie: []
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+    Me:
+      type: object
+      properties:
+        id: { type: string }
+        displayName: { type: string }
+        email: { type: string }
+        avatarUrl: { type: string, nullable: true }
+        isAdmin: { type: boolean }
+    Season:
+      type: object
+      properties:
+        id: { type: string }
+        year: { type: integer }
+        title: { type: string, nullable: true }
+        predictionOpenAt: { type: string, nullable: true }
+        predictionCloseAt: { type: string, nullable: true, description: "NULL=受付中" }
+        resultConfirmedAt: { type: string, nullable: true }
+        isOpen: { type: boolean, description: "受付中フラグ" }
+    Artist:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        nameKana: { type: string, nullable: true }
+        aliases:
+          type: array
+          items: { type: string }
+    Song:
+      type: object
+      properties:
+        id: { type: string }
+        artistId: { type: string }
+        title: { type: string }
+        titleKana: { type: string, nullable: true }
+    SongWithArtist:
+      allOf:
+        - $ref: "#/components/schemas/Song"
+        - type: object
+          properties:
+            artistName: { type: string }
+    ExternalArtist:
+      type: object
+      properties:
+        source: { type: string, enum: [spotify, musicbrainz] }
+        externalId: { type: string }
+        name: { type: string }
+        imageUrl: { type: string, nullable: true }
+        url: { type: string, nullable: true }
+        detail: { type: string, nullable: true }
+    ExternalTrack:
+      type: object
+      properties:
+        source: { type: string, enum: [spotify, musicbrainz] }
+        externalId: { type: string }
+        title: { type: string }
+        artistName: { type: string }
+        releaseYear: { type: integer, nullable: true }
+    CreatePrediction:
+      type: object
+      required: [seasonId, artist, confidence]
+      properties:
+        seasonId: { type: string }
+        artist:
+          type: object
+          required: [source, externalId, name]
+          properties:
+            source: { type: string, enum: [spotify, musicbrainz] }
+            externalId: { type: string }
+            name: { type: string }
+            imageUrl: { type: string, nullable: true }
+            url: { type: string, nullable: true }
+        song:
+          nullable: true
+          type: object
+          required: [source, externalId, title]
+          properties:
+            source: { type: string, enum: [spotify, musicbrainz] }
+            externalId: { type: string }
+            title: { type: string }
+            releaseYear: { type: integer, nullable: true }
+        confidence: { type: integer, minimum: 1, maximum: 5 }
+        comment: { type: string, maxLength: 500 }
+    UpdatePrediction:
+      type: object
+      description: 最低1項目が必要。song:null で曲予想を外す。
+      properties:
+        song:
+          nullable: true
+          type: object
+          properties:
+            source: { type: string, enum: [spotify, musicbrainz] }
+            externalId: { type: string }
+            title: { type: string }
+            releaseYear: { type: integer, nullable: true }
+        confidence: { type: integer, minimum: 1, maximum: 5 }
+        comment: { type: string, maxLength: 500, nullable: true }
+    Prediction:
+      type: object
+      properties:
+        id: { type: string }
+        userId: { type: string }
+        seasonId: { type: string }
+        artistId: { type: string }
+        songId: { type: string, nullable: true }
+        confidence: { type: integer }
+        comment: { type: string, nullable: true }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+    PredictionListItem:
+      allOf:
+        - $ref: "#/components/schemas/Prediction"
+        - type: object
+          properties:
+            artistName: { type: string }
+            songTitle: { type: string, nullable: true }
+            displayName: { type: string }
+    RankingRow:
+      type: object
+      properties:
+        rank: { type: integer }
+        userId: { type: string }
+        displayName: { type: string }
+        score: { type: integer }
+        hitCount: { type: integer }
+    WalletChallenge:
+      type: object
+      properties:
+        message: { type: string }
+        challenge: { type: string }
+    TokenAward:
+      type: object
+      properties:
+        id: { type: string }
+        seasonId: { type: string }
+        seasonYear: { type: integer }
+        amount: { type: integer }
+        status: { type: string, enum: [pending, sent, failed] }
+        txSignature: { type: string, nullable: true }
+
+  responses:
+    ValidationError:
+      description: 入力が不正（VALIDATION_ERROR）
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: 未ログイン / 署名検証失敗（UNAUTHORIZED）
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: 権限不足（FORBIDDEN）
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    SeasonClosed:
+      description: 締切後の操作（SEASON_CLOSED）
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: リソースが存在しない（NOT_FOUND）
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: 重複 / 前提未充足（CONFLICT）
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotConfigured:
+      description: 機能が未設定（NOT_CONFIGURED）
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+security:
+  - sessionCookie: []
