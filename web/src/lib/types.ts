@@ -4,6 +4,8 @@ export type User = {
   email: string;
   avatarUrl: string | null;
   isAdmin: boolean;
+  /** 所持ポイント残高 */
+  points: number;
 };
 
 export type Season = {
@@ -34,28 +36,49 @@ export type Prediction = {
   seasonId: string;
   artistId: string;
   songId: string | null;
-  confidence: number;
+  /** 賭け額 */
+  stake: number;
+  settled?: boolean;
+  payout?: number | null;
   comment: string | null;
   createdAt: string;
   // 一覧APIが付与する表示用フィールド
   artistName?: string;
   songTitle?: string | null;
   displayName?: string;
+  // 残高更新系APIが付与する
+  balanceAfter?: number;
 };
 
 export type RankingRow = {
   rank: number;
   userId: string;
   displayName: string;
+  /** overall は残高、season は純損益 */
   score: number;
-  hitCount: number;
+  // season ランキングのみ
+  staked?: number;
+  won?: number;
+  hitCount?: number;
 };
 
 export type MyPoints = {
   score: number;
   rank: number | null;
-  hitCount: number;
   totalUsers: number;
+};
+
+export type LedgerReason = "signup" | "daily" | "bet" | "payout" | "refund";
+
+export type LedgerEntry = {
+  id: string;
+  userId: string;
+  delta: number;
+  reason: LedgerReason;
+  balanceAfter: number;
+  refId: string | null;
+  note: string | null;
+  createdAt: string;
 };
 
 export type ExternalSource = "spotify" | "musicbrainz";

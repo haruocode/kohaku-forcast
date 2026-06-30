@@ -45,14 +45,15 @@ export function RankingsPanel() {
     if (rows.length === 0) {
       return <p className="muted">まだランキングはありません。</p>;
     }
+    const isSeason = scope === "season";
     return (
       <table className="ranking">
         <thead>
           <tr>
             <th>順位</th>
             <th>ユーザー</th>
-            <th>スコア</th>
-            <th>的中</th>
+            <th>{isSeason ? "損益" : "所持ポイント"}</th>
+            {isSeason && <th>的中</th>}
           </tr>
         </thead>
         <tbody>
@@ -60,8 +61,12 @@ export function RankingsPanel() {
             <tr key={r.userId}>
               <td>{r.rank}</td>
               <td>{r.displayName}</td>
-              <td>{r.score}</td>
-              <td>{r.hitCount}</td>
+              <td>
+                {isSeason && r.score > 0 ? "+" : ""}
+                {r.score}
+                {isSeason ? "" : " pt"}
+              </td>
+              {isSeason && <td>{r.hitCount ?? 0}</td>}
             </tr>
           ))}
         </tbody>

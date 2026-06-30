@@ -49,18 +49,16 @@ export function AuthBar() {
         <span className="muted">…</span>
       ) : me ? (
         <span className="authbar-right">
-          {points && (
-            <span
-              className="points"
-              title={
-                points.rank
-                  ? `通算 ${points.rank}位 / ${points.totalUsers}人・的中 ${points.hitCount}件`
-                  : "まだ通算ポイントはありません"
-              }
-            >
-              🏅 {points.score} pt
-            </span>
-          )}
+          <span
+            className="points"
+            title={
+              points?.rank
+                ? `所持 ${me.points} pt・${points.rank}位 / ${points.totalUsers}人`
+                : "所持ポイント"
+            }
+          >
+            🏅 {me.points} pt
+          </span>
           {me.avatarUrl && <img className="avatar" src={me.avatarUrl} alt="" />}
           {editing ? (
             <span className="name-edit">

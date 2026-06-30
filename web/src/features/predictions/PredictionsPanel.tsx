@@ -111,18 +111,22 @@ function SongSearch({
   );
 }
 
+const MIN_BET = 10;
+
 function PredictionForm({
   season,
   artist,
+  me,
   onDone,
 }: {
   season: Season;
   artist: ExternalArtist;
+  me: User;
   onDone: () => void;
 }) {
   const qc = useQueryClient();
   const [song, setSong] = useState<ExternalTrack | null>(null);
-  const [confidence, setConfidence] = useState(3);
+  const [stake, setStake] = useState(100);
   const [comment, setComment] = useState("");
 
   const create = useMutation({
@@ -131,44 +135,62 @@ function PredictionForm({
         seasonId: season.id,
         artist,
         song,
-        confidence,
+        stake,
         comment: comment || undefined,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["predictions"] });
+      qc.invalidateQueries({ queryKey: ["me"] });
+      qc.invalidateQueries({ queryKey: ["my-points"] });
       onDone();
     },
   });
 
+  const invalid =
+    !Number.isFinite(stake) || stake < MIN_BET || stake > me.points;
+
   return (
     <div className="card">
-      <h3>{artist.name} を予想</h3>
+      <h3>{artist.name} に賭ける</h3>
       <label>
         歌う曲（任意・出場予想のみも可）
         <SongSearch artist={artist} selected={song} onSelect={setSong} />
       </label>
       <label>
-        確信度: {confidence}
+        賭け額（ポイント）
         <input
-          type="range"
-          min={1}
-          max={5}
-          value={confidence}
-          onChange={(e) => setConfidence(Number(e.target.value))}
+          type="number"
+          min={MIN_BET}
+          max={me.points}
+          step={10}
+          value={stake}
+          onChange={(e) => setStake(Math.floor(Number(e.target.value)))}
         />
       </label>
+      <p className="muted bet-hint">
+        所持 {me.points} pt ・ 出場的中で ×2、曲も的中で ×4（早押しで最大 ×1.5）
+        {stake >= MIN_BET && stake <= me.points ? (
+          <>
+            {" "}
+            ｜的中なら最大 <strong>{stake * 4}</strong> pt
+          </>
+        ) : null}
+      </p>
       <label>
         コメント
         <input value={comment} onChange={(e) => setComment(e.target.value)} />
       </label>
       <div className="row">
-        <button disabled={create.isPending} onClick={() => create.mutate()}>
-          予想する
+        <button disabled={create.isPending || invalid} onClick={() => create.mutate()}>
+          {stake > me.points ? "残高不足" : "この額で賭ける"}
         </button>
         <button className="ghost" onClick={onDone}>
           やめる
         </button>
       </div>
+      {stake > me.points && (
+        <p className="error">所持ポイントを超えています（所持 {me.points} pt）。</p>
+      )}
       {create.error instanceof ApiError && (
         <p className="error">{create.error.message}</p>
       )}
@@ -189,6 +211,8 @@ function PredictionList({ season, me }: { season: Season; me: User | null }) {
     mutationFn: (id: string) => apiSend<{ ok: boolean }>("DELETE", `/predictions/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["predictions"] });
+      qc.invalidateQueries({ queryKey: ["me"] });
+      qc.invalidateQueries({ queryKey: ["my-points"] });
       setPendingDelete(null);
     },
   });
@@ -219,10 +243,16 @@ function PredictionList({ season, me }: { season: Season; me: User | null }) {
                     )}
                   </div>
                   <div className="prediction-meta muted">
-                    <span className="stars" title={`確信度 ${p.confidence} / 5`}>
-                      {"★".repeat(p.confidence)}
-                      {"☆".repeat(5 - p.confidence)}
+                    <span className="bet-chip" title="賭け額">
+                      💰 {p.stake} pt
                     </span>
+                    {p.settled ? (
+                      <span
+                        className={p.payout && p.payout > 0 ? "settled-win" : "settled-lose"}
+                      >
+                        {p.payout && p.payout > 0 ? `的中 +${p.payout}` : "外れ"}
+                      </span>
+                    ) : null}
                     <span>
                       {p.displayName ?? "匿名"}
                       {mine ? "（あなた）" : ""}
@@ -284,7 +314,12 @@ export function PredictionsPanel({ me }: { me: User | null }) {
       ) : !season.isOpen ? (
         <p className="muted">この回の受付は終了しています。</p>
       ) : artist ? (
-        <PredictionForm season={season} artist={artist} onDone={() => setArtist(null)} />
+        <PredictionForm
+          season={season}
+          artist={artist}
+          me={me}
+          onDone={() => setArtist(null)}
+        />
       ) : (
         <ArtistSearch onPick={setArtist} />
       )}

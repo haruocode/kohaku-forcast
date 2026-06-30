@@ -56,6 +56,36 @@ body {
   white-space: nowrap;
 }
 
+.bet-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3949ab;
+  font-weight: 700;
+}
+
+.bet-hint {
+  margin: 4px 0;
+  font-size: 13px;
+}
+
+.settled-win {
+  color: #1b8a3a;
+  font-weight: 700;
+}
+
+.settled-lose {
+  color: #b5384a;
+  font-weight: 700;
+}
+
+.ranking.history td {
+  font-variant-numeric: tabular-nums;
+}
+
 /* 表示名の編集 */
 .name-btn {
   background: none;
