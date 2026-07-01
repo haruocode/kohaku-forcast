@@ -13,11 +13,19 @@ export function AuthBar() {
   const [name, setName] = useState("");
 
   const logout = async () => {
-    await apiPost("/auth/logout");
-    // ユーザー依存のキャッシュを捨ててから、me を即 null にして画面を確実に切り替える
-    // （再フェッチ任せにせず、タイミング依存をなくす）。
-    qc.clear();
-    qc.setQueryData(["me"], null);
+    // POSTが失敗しても（ネットワーク断・非JSON応答など）UIは必ずログアウト状態へ
+    // 切り替える。ここで例外が伝播すると qc.clear() に到達せず、ログアウトボタンが
+    // 表示され続けてしまうため finally で確実に実行する。
+    try {
+      await apiPost("/auth/logout");
+    } catch (e) {
+      console.error("ログアウトAPIに失敗しました", e);
+    } finally {
+      // ユーザー依存のキャッシュを捨ててから、me を即 null にして画面を確実に切り替える
+      // （再フェッチ任せにせず、タイミング依存をなくす）。
+      qc.clear();
+      qc.setQueryData(["me"], null);
+    }
   };
 
   const save = useMutation({

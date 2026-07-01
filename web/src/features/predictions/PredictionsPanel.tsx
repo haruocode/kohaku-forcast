@@ -309,7 +309,7 @@ export function PredictionsPanel({ me }: { me: User | null }) {
       </h2>
       {!me ? (
         <p className="muted">
-          予想には<a href={loginUrl}>ログイン</a>してください。
+          予想するには<a href={loginUrl}>Googleでログイン</a>する必要があります。
         </p>
       ) : !season.isOpen ? (
         <p className="muted">この回の受付は終了しています。</p>
